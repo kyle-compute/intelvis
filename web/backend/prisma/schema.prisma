@@ -1,0 +1,78 @@
+// schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------- METADATA ----------
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  devices   Device[]
+}
+
+model Nic {
+  id        String   @id @default(cuid())
+  mac       String   @unique
+  deviceId  String?  @unique
+  device    Device?  @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  addedAt   DateTime @default(now())
+}
+
+enum DeviceStatus {
+  ACTIVE
+  INACTIVE
+  DECOMMISSIONED
+}
+
+model Device {
+  id        String   @id @default(cuid())
+  ownerId   String
+  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  parentId  String?
+  parent    Device?  @relation("DeviceTree", fields: [parentId], references: [id], onDelete: NoAction, map: "device_parent_id_fkey")
+  children  Device[] @relation("DeviceTree")
+
+  // This will be a TEXT column first. We will manually ALTER it to LTREE.
+  path      String?  @db.Text
+  alias     String?
+  status    DeviceStatus @default(ACTIVE)
+
+  nicId     String?  @unique
+  nic       Nic?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  Telemetry Telemetry[]
+
+  @@index([ownerId, status])
+  // The GiST index on `path` will be created manually via SQL after the column type is changed.
+}
+
+// ---------- TELEMETRY (TIME-SERIES DATA) ----------
+
+model Telemetry {
+  id        BigInt   @id @default(autoincrement())
+  deviceId  String
+  device    Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  
+  eventTs   DateTime @db.Timestamp(6)
+  leakRate  Float    @db.DoublePrecision
+  pressure  Float    @db.DoublePrecision
+  payload   Json?
+
+  ownerId   String
+
+  @@index([deviceId, eventTs(sort: Desc)])
+  @@index([ownerId, eventTs(sort: Desc)])
+}
