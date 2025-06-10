@@ -1,9 +1,7 @@
 // backend/middleware/protect.js
-
+import prisma from '../lib/db.js';
 import jwt from 'jsonwebtoken';
-import { PrismaClient } from '@prisma/client';
 
-const prisma = new PrismaClient();
 
 export const protect = async (req, res, next) => {
   let token;

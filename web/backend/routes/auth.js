@@ -3,11 +3,9 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { PrismaClient } from '@prisma/client';
-// Correctly import with the .js extension
+import prisma from '../lib/db.js'; // This is the only prisma import you need
 import { protect } from '../middleware/protect.js';
 
-const prisma = new PrismaClient();
 const router = Router();
 
 const JWT_SECRET = process.env.JWT_SECRET;
