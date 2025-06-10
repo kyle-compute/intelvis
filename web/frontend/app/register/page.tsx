@@ -52,14 +52,33 @@ export default function RegisterPage() {
     },
   })
 
-  async function onSubmit(values: z.infer<typeof formSchema>) {
+ async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true)
-    await new Promise((r) => setTimeout(r, 1500)) // stub register
-    setIsLoading(false)
-    toast.success("Account created.")
-    router.push("/login")
-  }
+    try {
+      const response = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        // We only need to send email and password to the register endpoint
+        body: JSON.stringify({
+          email: values.email,
+          password: values.password,
+        }),
+      })
 
+      const data = await response.json()
+
+      if (response.ok) {
+        toast.success("Account created successfully! Please log in.")
+        router.push("/login")
+      } else {
+        toast.error(data.message || "Registration failed. Please try again.")
+      }
+    } catch (error) {
+      toast.error("An error occurred. Please check your connection.")
+    } finally {
+      setIsLoading(false)
+    }
+  }
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <Card className="w-full max-w-sm shadow-lg">

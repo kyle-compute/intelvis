@@ -62,7 +62,7 @@ model Device {
 // ---------- TELEMETRY (TIME-SERIES DATA) ----------
 
 model Telemetry {
-  id        BigInt   @id @default(autoincrement())
+  // The `id` column is removed.
   deviceId  String
   device    Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
   
@@ -73,6 +73,7 @@ model Telemetry {
 
   ownerId   String
 
-  @@index([deviceId, eventTs(sort: Desc)])
+  @@id([deviceId, eventTs]) // <-- New composite primary key
+  @@index([deviceId, eventTs(sort: Desc)]) // Keep this for fast lookups
   @@index([ownerId, eventTs(sort: Desc)])
 }

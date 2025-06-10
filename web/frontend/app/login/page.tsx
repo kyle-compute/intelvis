@@ -9,7 +9,7 @@ import { useForm } from "react-hook-form"
 import * as z from "zod"
 import { Loader2 } from "lucide-react"
 import { toast } from "sonner"
-
+import { useAuth } from "@/context/AuthContext" 
 import { Button } from "@/components/ui/button"
 import {
   Form,
@@ -35,6 +35,7 @@ const formSchema = z.object({
 
 export default function LoginPage() {
   const router = useRouter()
+  const { login } = useAuth() // <-- ADD THIS LINE to get the login function from context
   const [isLoading, setIsLoading] = useState(false)
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -45,12 +46,29 @@ export default function LoginPage() {
     },
   })
 
-  async function onSubmit(values: z.infer<typeof formSchema>) {
+async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true)
-    await new Promise((r) => setTimeout(r, 1500)) // stub login
-    setIsLoading(false)
-    toast.success("Logged in.")
-    router.push("/dashboard")
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(values),
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        login(data) // Update the global auth state
+        toast.success("Logged in successfully.")
+        router.push("/dashboard")
+      } else {
+        toast.error(data.message || "Login failed. Please try again.")
+      }
+    } catch (error) {
+      toast.error("An error occurred. Please check your connection.")
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (

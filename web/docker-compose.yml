@@ -1,9 +1,9 @@
 
-# NEW - CORRECT IMAGE
+
 services:
+  # 1. The Database Service
   db:
     image: timescale/timescaledb:latest-pg16
-    # ... rest of the service
     container_name: iot-db
     restart: always
     environment:
@@ -11,12 +11,17 @@ services:
       - POSTGRES_PASSWORD=password
       - POSTGRES_DB=mydb
     ports:
-      - '5432:5432' # Expose port 5432 to your host machine for tools like TablePlus
+      - '5432:5432'
     volumes:
       - db_data:/var/lib/postgresql/data
+    # --- ADD THIS BLOCK ---
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d mydb"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
-  # 2. The Backend Service (e.g., Node.js/Express)
-
+  # 2. The Backend Service
   backend:
     build:
       context: ./backend
@@ -25,16 +30,16 @@ services:
     restart: always
     ports:
       - '3001:3001'
+    # --- MODIFY THIS BLOCK ---
     depends_on:
-      - db
+      db:
+        condition: service_healthy # Wait for the healthcheck to pass
     environment:
-      # It now reads the DOCKER variable from your .env file
       - DATABASE_URL=${DATABASE_URL_DOCKER}
       - JWT_SECRET=${JWT_SECRET}
     volumes:
       - ./backend:/app
       - /app/node_modules
-
   frontend:
     build:
       context: ./frontend # Assumes your frontend code is in a 'frontend' folder
