@@ -9,6 +9,32 @@ const router = Router();
 // @route   POST /api/devices// backend/routes/devices.js
 
 // ... keep your import statements and the router.get(...) route ...
+router.get('/', protect, async (req, res) => {
+  const ownerId = req.user.id; // The 'protect' middleware gives us this
+
+  try {
+    const devices = await prisma.device.findMany({
+      where: {
+        ownerId: ownerId,
+      },
+      // We must also fetch the related Nic to get the MAC address for display
+      include: {
+        nic: {
+          select: {
+            mac: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc', // Show newest devices first
+      },
+    });
+    res.status(200).json(devices);
+  } catch (error) {
+    console.error('Error fetching devices:', error);
+    res.status(500).json({ message: 'Server error while fetching devices' });
+  }
+});
 
 router.post('/', protect, async (req, res) => {
   const { mac } = req.body;
