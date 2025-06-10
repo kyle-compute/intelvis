@@ -1,0 +1,55 @@
+# docker-compose.yml
+version: '3.8'
+
+services:
+  # 1. The Database Service (Unchanged)
+  db:
+    image: timescale/timescaledb-ha:pg16-ts3.13
+    container_name: iot-db
+    restart: always
+    environment:
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=mydb
+    ports:
+      - '5432:5432' # Expose port 5432 to your host machine for tools like TablePlus
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+  # 2. The Backend Service (e.g., Node.js/Express)
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: iot-backend
+    restart: always
+    ports:
+      - '3001:3001'
+    depends_on:
+      - db
+    environment:
+      # It now reads the DOCKER variable from your .env file
+      - DATABASE_URL=${DATABASE_URL_DOCKER}
+      - JWT_SECRET=${JWT_SECRET}
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+
+  frontend:
+    build:
+      context: ./frontend # Assumes your frontend code is in a 'frontend' folder
+      dockerfile: Dockerfile
+    container_name: iot-frontend
+    restart: always
+    ports:
+      - '3000:3000' # Expose the web app on port 3000
+    depends_on:
+      - backend # Good practice to wait for the backend
+    volumes:
+      # Mount your frontend code for live reloading
+      - ./frontend:/app
+      - /app/node_modules
+
+volumes:
+  db_data: # This volume persists your database data even if the container is removed
