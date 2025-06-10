@@ -1,12 +1,20 @@
-// server/index.js
-const express = require('express');
+// backend/index.js
+
+import express from 'express';
+import cookieParser from 'cookie-parser';
+import authRoutes from './routes/auth.js'; // Import the new router
+
 const app = express();
-const PORT = 4000; // A different port than your Next.js app (which uses 3000)
+const port = 4000; // Make sure this is different from your frontend port
 
-app.get('/', (req, res) => {
-  res.send('Hello from the IntelVis Backend!');
-});
+// --- Core Middleware ---
+app.use(express.json()); // To parse JSON bodies
+app.use(cookieParser()); // To parse cookies from the request
 
-app.listen(PORT, () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
+// --- API Routes ---
+// Tell Express to use your auth routes for any request to '/api/auth'
+app.use('/api/auth', authRoutes);
+
+app.listen(port, () => {
+  console.log(`Server is running on http://localhost:${port}`);
 });
