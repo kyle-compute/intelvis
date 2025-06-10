@@ -1,0 +1,751 @@
+
+Here is the complete summary of our entire journey, with the final, correct code and workflows. Copy this into a new markdown file like PROJECT_BIBLE.md and make it the source of truth for your team.
+Project Architecture & Development Bible
+
+This document is the single source of truth for the application's architecture, code, and development workflows. It is designed to onboard new developers, align the team, and prevent technical debt.
+Core Architectural Principles
+
+    Scalability: The database is designed from the ground up to handle billions of IoT telemetry points using PostgreSQL with TimescaleDB.
+
+    Maintainability: A strict separation between a device's logical identity (Device) and its physical hardware (Nic) allows for seamless board swaps and long-term management without data loss.
+
+    Reproducibility: The entire development environment is containerized with Docker, ensuring that every developer's machine and the production environment are identical and predictable.
+
+1. Local Development Environment Setup
+
+This section details the one-time setup process for any developer joining the project.
+1.1. Project Structure
+
+The project follows a standard monorepo structure:
+
+      
+/web/                   <-- PROJECT ROOT
+├── docker-compose.yml  <-- Defines all services
+├── .env                <-- Holds environment variables
+├── /backend/
+│   ├── Dockerfile
+│   ├── .dockerignore
+│   ├── package.json
+│   ├── index.js
+│   ├── /prisma/
+│   │   └── schema.prisma
+│   └── /routes/
+│       ├── auth.js
+│       └── devices.js
+│   └── /middleware/
+│       └── protect.js
+└── /frontend/
+    ├── Dockerfile
+    ├── package.json
+    └── ... (Next.js app structure)
+
+    
+
+IGNORE_WHEN_COPYING_START
+Use code with caution.
+IGNORE_WHEN_COPYING_END
+1.2. First-Time Setup Workflow
+
+A new developer must follow these steps precisely from the project root (/web/).
+
+Step 1: Start All Services
+This command builds the Docker images and starts the database, backend, and frontend containers in the background. The healthcheck ensures the backend waits until the database is truly ready.
+
+      
+docker-compose up -d --build
+
+    
+
+IGNORE_WHEN_COPYING_START
+Use code with caution. Bash
+IGNORE_WHEN_COPYING_END
+
+Step 2: Run the Base Database Migration
+This command reaches into the running backend container and tells Prisma to create the initial database tables based on prisma/schema.prisma.
+
+      
+docker-compose exec backend npx prisma migrate dev --name init
+
+    
+
+IGNORE_WHEN_COPYING_START
+Use code with caution. Bash
+IGNORE_WHEN_COPYING_END
+
+Step 3: Apply Advanced Database Features
+This is a required, one-time setup step for the new database. This script upgrades the plain database with TimescaleDB, ltree, and the necessary triggers.
+
+      
+docker-compose exec -T db psql -U user -d mydb <<'EOF'
+-- 1. Enable ALL necessary extensions.
+CREATE EXTENSION IF NOT EXISTS ltree;
+CREATE EXTENSION IF NOT EXISTS timescaledb;
+
+-- 2. Alter the 'path' column from TEXT to the powerful LTREE type.
+ALTER TABLE "Device" ALTER COLUMN "path" TYPE ltree USING "path"::ltree;
+
+-- 3. Create the fast GiST index on the ltree column.
+CREATE INDEX "Device_path_idx" ON "Device" USING GIST ("path");
+
+-- 4. Convert the Telemetry table into a TimescaleDB hypertable.
+SELECT create_hypertable('"Telemetry"', 'eventTs');
+
+-- 5. Create the trigger function to automatically manage the device path.
+CREATE OR REPLACE FUNCTION update_device_path() RETURNS trigger AS $$
+  BEGIN
+    IF NEW."parentId" IS NULL THEN
+      NEW.path = text2ltree(NEW.id);
+    ELSE
+      SELECT D.path || text2ltree(NEW.id)
+      INTO NEW.path
+      FROM "Device" AS D
+      WHERE D.id = NEW."parentId";
+    END IF;
+    RETURN NEW;
+  END;
+$$ LANGUAGE plpgsql;
+
+-- 6. Attach the trigger to the Device table.
+CREATE TRIGGER trg_device_path_update
+BEFORE INSERT OR UPDATE OF "parentId" ON "Device"
+FOR EACH ROW EXECUTE PROCEDURE update_device_path();
+EOF
+
+    
+
+IGNORE_WHEN_COPYING_START
+Use code with caution. Bash
+IGNORE_WHEN_COPYING_END
+
+Your environment is now fully configured and ready for development.
+2. The Final Codebase
+
+This section contains the complete, final versions of all key configuration and code files.
+2.1. Docker Configuration
+docker-compose.yml
+
+This file defines our three services and uses a healthcheck to prevent startup race conditions.
+
+      
+services:
+  db:
+    image: timescale/timescaledb:latest-pg16
+    container_name: iot-db
+    restart: always
+    environment:
+      - POSTGRES_USER=user
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=mydb
+    ports:
+      - '5432:5432'
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d mydb"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: iot-backend
+    restart: always
+    ports:
+      - '4000:4000' # Backend runs on port 4000
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=${DATABASE_URL_DOCKER}
+      - JWT_SECRET=${JWT_SECRET}
+    volumes:
+      - ./backend:/app
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: iot-frontend
+    restart: always
+    ports:
+      - '3000:3000'
+    depends_on:
+      - backend
+
+volumes:
+  db_data:
+
+    
+
+IGNORE_WHEN_COPYING_START
+Use code with caution. Yaml
+IGNORE_WHEN_COPYING_END
+.env (in project root)
+
+      
+# --- For Docker Compose ---
+DATABASE_URL_DOCKER="postgresql://user:password@db:5432/mydb?schema=public"
+JWT_SECRET="your-strong-random-secret-key-goes-here"
+
+# --- For Local Machine Tools (Prisma Studio) ---
+DATABASE_URL="postgresql://user:password@localhost:5432/mydb?schema=public"
+
+    
+
+IGNORE_WHEN_COPYING_START
+Use code with caution. Env
+IGNORE_WHEN_COPYING_END
+backend/Dockerfile
+
+This builds the backend image, correctly layering npm install and prisma generate.
+
+      
+FROM node:20-alpine
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm install
+
+COPY prisma ./prisma/
+RUN npx prisma generate
+
+COPY . .
+
+EXPOSE 4000
+CMD [ "node", "index.js" ]
+
+    
+
+IGNORE_WHEN_COPYING_START
+Use code with caution. Dockerfile
+IGNORE_WHEN_COPYING_END
+backend/.dockerignore
+
+This is critical. It prevents the local node_modules from overwriting the container's, which would delete the generated Prisma client.
+
+      
+node_modules
+
+    
+
+IGNORE_WHEN_COPYING_START
+Use code with caution.
+IGNORE_WHEN_COPYING_END
+2.2. Backend Code
+backend/package.json
+
+Note the crucial type: "module" which enables modern import/export syntax.
+
+      
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.9.0",
+    "bcryptjs": "^2.4.3",
+    "cookie-parser": "^1.4.6",
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.2"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/cookie-parser": "^1.4.7",
+    "@types/express": "^4.17.21",
+    "@types/jsonwebtoken": "^9.0.6",
+    "prisma": "^6.9.0"
+  }
+}
+
+    
+
+IGNORE_WHEN_COPYING_START
+Use code with caution. Json
+IGNORE_WHEN_COPYING_END
+backend/prisma/schema.prisma
+
+The final, correct schema using a composite key for Telemetry to work with TimescaleDB.
+
+      
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  devices   Device[]
+}
+
+model Nic {
+  id        String   @id @default(cuid())
+  mac       String   @unique
+  deviceId  String?  @unique
+  device    Device?  @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  addedAt   DateTime @default(now())
+}
+
+enum DeviceStatus {
+  ACTIVE
+  INACTIVE
+  DECOMMISSIONED
+}
+
+model Device {
+  id        String   @id @default(cuid())
+  ownerId   String
+  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  parentId  String?
+  parent    Device?  @relation("DeviceTree", fields: [parentId], references: [id], onDelete: NoAction)
+  children  Device[] @relation("DeviceTree")
+  path      String?  @db.Text
+  alias     String?
+  status    DeviceStatus @default(ACTIVE)
+  nicId     String?  @unique
+  nic       Nic?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  Telemetry Telemetry[]
+  @@index([ownerId, status])
+}
+
+model Telemetry {
+  deviceId  String
+  device    Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  eventTs   DateTime @db.Timestamp(6)
+  leakRate  Float    @db.DoublePrecision
+  pressure  Float    @db.DoublePrecision
+  payload   Json?
+  ownerId   String
+  @@id([deviceId, eventTs])
+  @@index([deviceId, eventTs(sort: Desc)])
+  @@index([ownerId, eventTs(sort: Desc)])
+}
+
+    
+
+IGNORE_WHEN_COPYING_START
+Use code with caution. Prisma
+IGNORE_WHEN_COPYING_END
+backend/index.js
+
+The main server entry point.
+
+      
+import express from 'express';
+import cookieParser from 'cookie-parser';
+import authRoutes from './routes/auth.js';
+import deviceRoutes from './routes/devices.js';
+
+const app = express();
+const port = 4000;
+
+app.use(express.json());
+app.use(cookieParser());
+
+// API Routes
+app.use('/api/auth', authRoutes);
+app.use('/api/devices', deviceRoutes);
+
+app.listen(port, () => {
+  console.log(`Backend server is running on http://localhost:${port}`);
+});
+
+    
+
+IGNORE_WHEN_COPYING_START
+Use code with caution. JavaScript
+IGNORE_WHEN_COPYING_END
+backend/routes/auth.js
+
+All authentication logic.
+
+      
+import { Router } from 'express';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import { PrismaClient } from '@prisma/client';
+import { protect } from '../middleware/protect.js';
+
+const prisma = new PrismaClient();
+const router = Router();
+const JWT_SECRET = process.env.JWT_SECRET;
+const COOKIE_NAME = 'authToken';
+
+const setTokenCookie = (res, token) => {
+  res.cookie(COOKIE_NAME, token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    path: '/',
+  });
+};
+
+router.post('/register', async (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({ message: 'Please provide email and password' });
+  }
+  const existingUser = await prisma.user.findUnique({ where: { email } });
+  if (existingUser) {
+    return res.status(409).json({ message: 'User already exists' });
+  }
+  const salt = await bcrypt.genSalt(10);
+  const hashedPassword = await bcrypt.hash(password, salt);
+  const user = await prisma.user.create({
+    data: { email, password: hashedPassword },
+  });
+  res.status(201).json({ id: user.id, email: user.email });
+});
+
+router.post('/login', async (req, res) => {
+  const { email, password } = req.body;
+  const user = await prisma.user.findUnique({ where: { email } });
+  if (!user || !(await bcrypt.compare(password, user.password))) {
+    return res.status(401).json({ message: 'Invalid credentials' });
+  }
+  const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
+  setTokenCookie(res, token);
+  res.status(200).json({ id: user.id, email: user.email });
+});
+
+router.get('/me', protect, (req, res) => {
+  res.status(200).json(req.user);
+});
+
+router.post('/logout', (req, res) => {
+  res.cookie(COOKIE_NAME, '', { httpOnly: true, expires: new Date(0) });
+  res.status(200).json({ message: 'Logged out successfully' });
+});
+
+export default router;
+
+    
+
+IGNORE_WHEN_COPYING_START
+Use code with caution. JavaScript
+IGNORE_WHEN_COPYING_END
+backend/middleware/protect.js
+
+The authentication gatekeeper.
+
+      
+import jwt from 'jsonwebtoken';
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
+
+export const protect = async (req, res, next) => {
+  let token;
+  if (req.cookies.authToken) {
+    try {
+      token = req.cookies.authToken;
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      req.user = await prisma.user.findUnique({
+        where: { id: decoded.userId },
+        select: { id: true, email: true, createdAt: true },
+      });
+      if (!req.user) {
+        return res.status(401).json({ message: 'Not authorized, user not found' });
+      }
+      next();
+    } catch (error) {
+      return res.status(401).json({ message: 'Not authorized, token failed' });
+    }
+  }
+  if (!token) {
+    res.status(401).json({ message: 'Not authorized, no token' });
+  }
+};
+
+    
+
+IGNORE_WHEN_COPYING_START
+Use code with caution. JavaScript
+IGNORE_WHEN_COPYING_END
+backend/routes/devices.js
+
+The logic for adding a device to a user account.
+
+      
+import { Router } from 'express';
+import { PrismaClient } from '@prisma/client';
+import { protect } from '../middleware/protect.js';
+
+const prisma = new PrismaClient();
+const router = Router();
+
+router.post('/', protect, async (req, res) => {
+  const { mac } = req.body;
+  const ownerId = req.user.id;
+  if (!mac) {
+    return res.status(400).json({ message: 'MAC address is required' });
+  }
+  try {
+    const nic = await prisma.nic.findUnique({
+      where: { mac: mac.toLowerCase() },
+    });
+    if (!nic) {
+      return res.status(404).json({ message: 'Device with this MAC not found' });
+    }
+    if (nic.deviceId) {
+      return res.status(409).json({ message: 'Device already claimed' });
+    }
+    const newDevice = await prisma.device.create({
+      data: { ownerId: ownerId, nicId: nic.id },
+    });
+    res.status(201).json(newDevice);
+  } catch (error) {
+    console.error('Error adding device:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+export default router;
+
+    
+
+IGNORE_WHEN_COPYING_START
+Use code with caution. JavaScript
+IGNORE_WHEN_COPYING_END
+2.3. Frontend Code
+frontend/context/AuthContext.tsx
+
+The global state manager for authentication.
+
+      
+"use client"
+
+import { createContext, useContext, useState, useEffect, ReactNode } from "react"
+import { useRouter } from "next/navigation"
+
+interface User {
+  id: string
+  email: string
+  createdAt: string
+}
+
+interface AuthContextType {
+  user: User | null
+  isLoading: boolean
+  login: (userData: User) => void
+  logout: () => void
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined)
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState<User | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const router = useRouter()
+
+  useEffect(() => {
+    const checkUserStatus = async () => {
+      try {
+        const response = await fetch("/api/auth/me")
+        if (response.ok) {
+          setUser(await response.json())
+        } else {
+          setUser(null)
+        }
+      } catch (error) {
+        setUser(null)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    checkUserStatus()
+  }, [])
+
+  const login = (userData: User) => setUser(userData)
+
+  const logout = async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" })
+    } finally {
+      setUser(null)
+      router.push("/login")
+    }
+  }
+
+  return (
+    <AuthContext.Provider value={{ user, isLoading, login, logout }}>
+      {children}
+    </AuthContext.Provider>
+  )
+}
+
+export const useAuth = () => {
+  const context = useContext(AuthContext)
+  if (context === undefined) {
+    throw new Error("useAuth must be used within an AuthProvider")
+  }
+  return context
+}
+
+    
+
+IGNORE_WHEN_COPYING_START
+Use code with caution. Tsx
+IGNORE_WHEN_COPYING_END
+frontend/app/layout.tsx
+
+Wrapping the entire app in the AuthProvider.
+
+      
+import "./globals.css"
+import { ReactNode } from "react"
+import { AuthProvider } from "@/context/AuthContext"
+import { Navbar } from "@/components/ui/navbar"
+import { Toaster } from "@/components/ui/sonner" // Assuming you have this
+
+export default function RootLayout({ children }: { children: ReactNode }) {
+  return (
+    <html lang="en" suppressHydrationWarning>
+      <body className="min-h-screen">
+        <AuthProvider>
+          <Navbar />
+          <div className="pt-16">{children}</div>
+          <Toaster />
+        </AuthProvider>
+      </body>
+    </html>
+  )
+}
+
+    
+
+IGNORE_WHEN_COPYING_START
+Use code with caution. Tsx
+IGNORE_WHEN_COPYING_END
+frontend/app/(auth)/login/page.tsx
+
+The login form with real API logic.
+
+      
+"use client"
+
+import { useState } from "react"
+import { useRouter } from "next/navigation"
+import Link from "next/link"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { useForm } from "react-hook-form"
+import * as z from "zod"
+import { Loader2 } from "lucide-react"
+import { toast } from "sonner"
+import { useAuth } from "@/context/AuthContext"
+import { Button } from "@/components/ui/button"
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
+import { Input } from "@/components/ui/input"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+
+const formSchema = z.object({
+  email: z.string().email({ message: "Enter a valid email." }),
+  password: z.string().min(8, { message: "Password ≥ 8 characters." }),
+})
+
+export default function LoginPage() {
+  const router = useRouter()
+  const { login } = useAuth()
+  const [isLoading, setIsLoading] = useState(false)
+
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: { email: "", password: "" },
+  })
+
+  async function onSubmit(values: z.infer<typeof formSchema>) {
+    setIsLoading(true)
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(values),
+      })
+      const data = await response.json()
+      if (response.ok) {
+        login(data)
+        toast.success("Logged in successfully.")
+        router.push("/dashboard")
+      } else {
+        toast.error(data.message || "Login failed.")
+      }
+    } catch (error) {
+      toast.error("An error occurred.")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background p-4">
+      <Card className="w-full max-w-sm shadow-lg">
+        <CardHeader className="space-y-1">
+          <CardTitle className="text-2xl">Log in</CardTitle>
+          <CardDescription>Enter your credentials.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <FormField
+                control={form.control} name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email</FormLabel>
+                    <FormControl>
+                      <Input type="email" placeholder="name@example.com" disabled={isLoading} {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control} name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Password</FormLabel>
+                    <FormControl>
+                      <Input type="password" placeholder="••••••••" disabled={isLoading} {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <Button type="submit" className="w-full" disabled={isLoading || !form.formState.isValid}>
+                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Log in
+              </Button>
+            </form>
+          </Form>
+          <div className="mt-4 text-center text-sm">
+            Need an account?{" "}
+            <Link href="/register" className="font-medium text-primary underline-offset-4 hover:underline">
+              Sign up
+            </Link>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+    
+
+IGNORE_WHEN_COPYING_START
+Use code with caution. 

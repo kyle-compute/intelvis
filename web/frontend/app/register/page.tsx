@@ -43,14 +43,15 @@ export default function RegisterPage() {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
 
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      email: "",
-      password: "",
-      confirmPassword: "",
-    },
-  })
+const form = useForm<z.infer<typeof formSchema>>({
+  resolver: zodResolver(formSchema),
+  defaultValues: {
+    email: "",
+    password: "",
+    confirmPassword: "",
+  },
+  mode: 'onChange',
+})
 
  async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true)
