@@ -73,8 +73,8 @@ model Device {
   children  Device[] @relation("DeviceTree")
 
   // The 'path' uses a native PostgreSQL type not directly supported by Prisma,
-  // but Prisma will create it as a `text` column. A manual trigger manages this.
-  path      String?  @db.Unsupported("ltree")
+ // This will be a TEXT column first. We will manually ALTER it to LTREE.
+  path      String?  @db.Text 
   alias     String?
   status    DeviceStatus @default(ACTIVE)
 
@@ -195,13 +195,13 @@ DATABASE_URL="postgresql://user:password@localhost:5432/mydb?schema=public"
 # Docker Compose config (docker-compose.yml)
 
 ## This file deifnes all services and how they connect
-
+```
 version: '3.8'
 
 services:
   # 1. The Database Service
   db:
-    image: timescale/timescaledb-ha:pg16-ts3.13
+    image: timescale/timescaledb:latest-pg16
     container_name: iot-db
     restart: always
     environment:
@@ -249,3 +249,4 @@ services:
 
 volumes:
   db_data:
+  ```

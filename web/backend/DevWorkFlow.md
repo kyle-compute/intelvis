@@ -1,29 +1,55 @@
 # Daily Development Workflow
 
 ## Use these commands from the project root directory
+# Daily Development Workflow
 
-### 1. start all services
-`docker-compose up -d --build`
+Use these commands from the project root directory.
 
-### 2. run database migrations (migrations must be run in backend container)
-`docker-compose exec backend npx prisma migrate dev --name your-migration-name`
+---
 
-### 3. View the database with Prisma Studio: (This command is run from your local machine and uses the DATABASE_URL from your .env file.)
-`npx prisma studio`
+### First-Time Setup
 
-### 4. view logs for specific service
-`docker-compose logs -f backend  # Or 'db', 'frontend'`
+If you are setting up this project for the first time, follow these steps in order:
 
-### 5. stop all  services
-`docker-compose down`
+1.  **Start all services:**
+    ```bash
+    docker-compose up -d --build
+    ```
 
-# Production deployment strategy
+2.  **Run the database migrations:**
+    This command will read the `prisma/migrations` folder (which includes our manual SQL enhancements) and build your local database correctly.
+    ```bash
+    docker-compose exec backend npx prisma migrate deploy
+    ```
+    *Note: We use `migrate deploy` as it's good practice, but `migrate dev` would also work here.*
 
-## Database: Use a managed database service that supports TimescaleDB, like DigitalOcean's Managed TimescaleDB.
- 
-## Migrations: DO NOT use prisma migrate dev in production. Use the production-safe command in your deployment pipeline:
-`npx prisma migrate deploy`
+---
 
-Environment Variables: Securely provide the production DATABASE_URL and other secrets to your deployed backend application`
+### Making Schema Changes (Daily Workflow)
 
-      
+When you need to change the database schema:
+
+1.  **Edit your `prisma/schema.prisma` file.**
+
+2.  **Create a new migration:**
+    ```bash
+    # This creates a new migration file. Give it a descriptive name.
+    docker-compose exec backend npx prisma migrate dev --name your-change-description
+    ```
+
+3.  **Manually Edit the New Migration File (If Needed):**
+    If your changes require manual SQL (like adding a new `ltree` feature), open the newly created `migration.sql` file and add your SQL commands to the bottom.
+
+---
+
+### Other Useful Commands
+
+*   **View the database with Prisma Studio:**
+    `npx prisma studio`
+
+*   **View logs for all services:**
+    `docker-compose logs -f`
+
+*   **Stop all services:**
+    `docker-compose down`
+
