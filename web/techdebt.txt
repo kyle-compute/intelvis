@@ -749,3 +749,9 @@ export default function LoginPage() {
 
 IGNORE_WHEN_COPYING_START
 Use code with caution. 
+
+
+This command is for preseeding db with mac stuff i guess
+
+# This adds a NIC with MAC address 'aa:bb:cc:dd:ee:ff' into the database.
+docker-compose exec -T db psql -U user -d mydb -c "INSERT INTO \"Nic\" (id, mac) VALUES ('clxTESTnicID01234', 'aa:bb:cc:dd:ee:ff');"

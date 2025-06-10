@@ -4,7 +4,7 @@ import cookieParser from 'cookie-parser';
 
 
 import authRoutes from './routes/auth.js';
-// import deviceRoutes from './routes/devices.js'; 
+import deviceRoutes from './routes/devices.js'; 
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -15,7 +15,7 @@ app.use(cookieParser());
 
 // --- API Routes ---
 app.use('/api/auth', authRoutes);
-// app.use('/api/devices', deviceRoutes); 
+app.use('/api/devices', deviceRoutes); 
 
 // --- Health Check Route (Good for debugging) ---
 app.get('/api/health', (req, res) => {
