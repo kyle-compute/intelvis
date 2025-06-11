@@ -1,4 +1,4 @@
-// frontend/context/AuthContext.tsx - THE FINAL, CORRECTED VERSION
+// frontend/context/AuthContext.tsx - THIS IS THE ONLY CORRECT VERSION
 "use client"
 
 import {
@@ -8,9 +8,6 @@ import {
   useState,
   ReactNode,
 } from "react"
-
-// Note: No longer need useRouter here as we use window for redirects
-// to break the race condition.
 
 interface User {
   id: string
@@ -68,15 +65,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         throw new Error(errorData.message || "Invalid credentials");
       }
       
-      // On success, we don't even need to parse the user data.
-      // We force a hard reload to the dashboard. The AuthContext's
-      // initial useEffect will then run on a fresh page and fetch the user.
-      // This completely breaks the race condition.
+      // THIS IS THE FIX. IT IS NOT NEGOTIABLE.
       window.location.replace("/dashboard");
 
     } finally {
-      // In the success case, the page reloads so this is never hit.
-      // It will only be hit on failure.
       setIsLoading(false);
     }
   };
@@ -91,7 +83,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setUser(null);
       setIsLoading(false);
-      // A hard redirect is also more robust for logout.
       window.location.replace("/login");
     }
   };
@@ -100,7 +91,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     <AuthContext.Provider
       value={{ user, isLoading, isAuthCheckComplete, login, logout }}
     >
-      {isAuthCheckComplete ? children : null /* Or a loading spinner */}
+      {isAuthCheckComplete ? children : <div className="flex items-center justify-center min-h-screen">Loading Application...</div>}
     </AuthContext.Provider>
   )
 }
