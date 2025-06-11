@@ -12,6 +12,20 @@ const COOKIE_NAME = 'authToken';
 
 // backend/routes/auth.js
 
+const setTokenCookie = (res, token) => {
+  res.cookie(COOKIE_NAME, token, {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'none',
+    // THIS IS THE FIX: Makes cookie available to all subdomains of intelvis.ai
+    domain: '.intelvis.ai', 
+    path: '/',
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+  });
+};
+
+// backend/routes/auth.js
+
 router.post('/logout', (req, res) => {
   res.cookie(COOKIE_NAME, '', {
     httpOnly: true,
@@ -23,24 +37,6 @@ router.post('/logout', (req, res) => {
   });
   res.status(200).json({ message: 'Logged out successfully' });
 });
-
-router.post('/register', async (req, res) => {
-  const { email, password } = req.body;
-  if (!email || !password) {
-    return res.status(400).json({ message: 'Please provide email and password' });
-  }
-  const existingUser = await prisma.user.findUnique({ where: { email } });
-  if (existingUser) {
-    return res.status(409).json({ message: 'User already exists' });
-  }
-  const salt = await bcrypt.genSalt(10);
-  const hashedPassword = await bcrypt.hash(password, salt);
-  const user = await prisma.user.create({
-    data: { email, password: hashedPassword },
-  });
-  res.status(201).json({ id: user.id, email: user.email });
-});
-
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;
   const user = await prisma.user.findUnique({ where: { email } });
