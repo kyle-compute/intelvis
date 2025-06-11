@@ -1,18 +1,10 @@
-# Caddyfile - FINAL & SIMPLIFIED
+# Caddyfile - THE FINAL, SIMPLIFIED VERSION
 
 intelvis.ai {
     reverse_proxy frontend:3000
 }
 
-# Match all requests to the API subdomain
 api.intelvis.ai {
-    # Match any path that starts with /api/
-    @api path /api/*
-    
-    # Rewrite the path to remove the /api prefix before forwarding
-    # /api/auth/register becomes /auth/register
-    rewrite @api /api{path}
-    
-    # Forward the rewritten request to the backend
-    reverse_proxy @api backend:3001
+    # Simple, clean proxy pass. The backend handles the full /api path.
+    reverse_proxy backend:3001
 }
