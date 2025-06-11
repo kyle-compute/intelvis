@@ -1,4 +1,4 @@
-# docker-compose.prod.yml - FINAL & CORRECTED
+# docker-compose.prod.yml - THE FINAL & MOST ROBUST VERSION
 
 version: '3.8'
 
@@ -12,29 +12,26 @@ services:
       - caddy_data:/data
       - caddy_config:/config
     depends_on: [frontend, backend]
-    environment:
-      - DOMAIN_NAME=${DOMAIN_NAME}
+    # FIX: Load all variables directly from the .env file.
+    env_file: ./.env
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      # FIX: Pass the build argument directly from the .env file.
+      args:
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
     restart: unless-stopped
     expose: [3000]
-    environment:
-      - NODE_ENV=production
-      # FIX: Pass the public API URL to the frontend so it knows where to send requests.
-      # The value comes from the .env file variable 'DOMAIN_NAME'.
-      - NEXT_PUBLIC_API_URL=https://api.${DOMAIN_NAME}
+    # FIX: Load all variables directly from the .env file.
+    env_file: ./.env
 
   backend:
     build: ./backend
     restart: unless-stopped
     expose: [3001]
-    environment:
-      - NODE_ENV=production
-      - DATABASE_URL=${DATABASE_URL}
-      - PORT=3001
-      - JWT_SECRET=${JWT_SECRET}
-      - PROVISIONING_API_KEY=${PROVISIONING_API_KEY}
+    # FIX: Load all variables directly from the .env file.
+    env_file: ./.env
     depends_on:
       db:
         condition: service_healthy
@@ -42,10 +39,8 @@ services:
   db:
     image: timescale/timescaledb:latest-pg16
     restart: unless-stopped
-    environment:
-      - POSTGRES_USER=user
-      - POSTGRES_PASSWORD=password
-      - POSTGRES_DB=mydb
+    # FIX: Load all variables directly from the .env file.
+    env_file: ./.env
     volumes:
       - db_data:/var/lib/postgresql/data
     healthcheck:
