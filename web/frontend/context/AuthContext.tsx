@@ -58,6 +58,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
+        credentials: "include", // <-- THE FIX IS HERE
       });
 
       if (!res.ok) {
@@ -65,7 +66,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         throw new Error(errorData.message || "Invalid credentials");
       }
       
-      // THIS IS THE FIX. IT IS NOT NEGOTIABLE.
       window.location.replace("/dashboard");
 
     } finally {
