@@ -1,4 +1,4 @@
-// frontend/app/dashboard/page.tsx - THE FINAL & CORRECTED VERSION
+// frontend/app/dashboard/page.tsx - FINAL & CORRECTED VERSION
 "use client"
 
 import { useState, useEffect } from "react"
@@ -26,28 +26,33 @@ export default function DashboardPage() {
   // Fetch devices when the component loads and the user is available
   useEffect(() => {
     const fetchDevices = async () => {
-      if (!user) return; // Don't fetch if there's no user
+      // Don't fetch if auth is still loading or if there's no user
+      if (authIsLoading || !user) {
+        setIsFetchingDevices(false);
+        return;
+      }
 
       setIsFetchingDevices(true);
       try {
-        // FIX: Use the full, absolute path to the API
-        const response = await fetch(`${API_URL}/api/devices`);
+        // FIX: Add `credentials: 'include'` to send the auth cookie.
+        const response = await fetch(`${API_URL}/api/devices`, {
+          credentials: 'include'
+        });
+
         if (response.ok) {
           const data = await response.json();
           setDevices(data);
         } else {
-          toast.error("Failed to fetch devices.");
+          toast.error("Failed to fetch devices. Your session may have expired.");
         }
-      } catch  {
+      } catch {
         toast.error("An error occurred while fetching devices.");
       } finally {
         setIsFetchingDevices(false);
       }
     };
 
-    if (!authIsLoading) {
-      fetchDevices();
-    }
+    fetchDevices();
   }, [user, authIsLoading]);
 
   const handlePairDevice = async (e: React.FormEvent) => {
@@ -58,23 +63,28 @@ export default function DashboardPage() {
     }
     setIsPairing(true);
     try {
-      // FIX: Use the full, absolute path to the API
+      // FIX: Add `credentials: 'include'` to send the auth cookie.
       const response = await fetch(`${API_URL}/api/devices`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ mac: macAddress }),
+        credentials: 'include'
       });
 
       const newDevice = await response.json();
 
       if (response.ok) {
         toast.success("Device paired successfully!");
-        setDevices(prevDevices => [...prevDevices, newDevice]); // Add new device to the list
-        setMacAddress(""); // Clear the input
+        // Re-fetch devices to get the latest list including the new one
+        const fetchResponse = await fetch(`${API_URL}/api/devices`, { credentials: 'include' });
+        if (fetchResponse.ok) {
+          setDevices(await fetchResponse.json());
+        }
+        setMacAddress("");
       } else {
         toast.error(newDevice.message || "Failed to pair device.");
       }
-    } catch {
+    } catch  {
       toast.error("An error occurred during pairing.");
     } finally {
       setIsPairing(false);
@@ -82,11 +92,11 @@ export default function DashboardPage() {
   };
 
   if (authIsLoading) {
-    return <div className="p-8">Loading dashboard...</div>;
+    return <div className="p-8 text-center text-gray-500">Authenticating...</div>;
   }
 
   return (
-    <div className="p-8 max-w-4xl mx-auto">
+    <div className="p-4 sm:p-8 max-w-4xl mx-auto">
       <h1 className="text-3xl font-bold mb-2">Welcome, {user?.email}</h1>
       <p className="text-gray-400 mb-8">Your device dashboard.</p>
 
@@ -108,7 +118,7 @@ export default function DashboardPage() {
               />
               <button
                 type="submit"
-                className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-4 rounded-md mt-4 transition-colors flex items-center justify-center"
+                className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-4 rounded-md mt-4 transition-colors flex items-center justify-center disabled:bg-gray-600"
                 disabled={isPairing}
               >
                 {isPairing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -126,7 +136,7 @@ export default function DashboardPage() {
               {devices.map(device => (
                 <div key={device.id} className="bg-gray-900 p-4 rounded-lg flex justify-between items-center">
                   <div>
-                    <p className="font-bold">{device.alias || `Device ${device.id.slice(0, 6)}`}</p>
+                    <p className="font-bold">{device.alias || `Device ${device.id.slice(-6)}`}</p>
                     <p className="text-sm text-gray-400">{device.nic?.mac}</p>
                   </div>
                   <span className={`px-2 py-1 text-xs font-bold rounded-full ${device.status === 'ACTIVE' ? 'bg-green-500/20 text-green-400' : 'bg-gray-500/20 text-gray-400'}`}>
