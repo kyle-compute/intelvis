@@ -1,4 +1,4 @@
-// backend/index.js - THE FINAL, BULLETPROOF VERSION
+// backend/index.js - THE FINAL, CANONICAL & CORRECT VERSION
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
@@ -10,18 +10,14 @@ const app = express();
 const port = process.env.PORT || 3001;
 
 // --- Security Middleware (CORS) ---
+// This MUST come BEFORE any other middleware or routes.
 const corsOptions = {
   origin: 'https://intelvis.ai', // Your exact frontend URL
   credentials: true,
 };
 
-// FIX: Explicitly handle pre-flight OPTIONS requests.
-// The browser sends an OPTIONS request first for any non-simple request.
-// This new route handler will catch it, apply CORS, and respond with 204 No Content.
-// This MUST come before the general app.use(cors(corsOptions)).
-app.options('*', cors(corsOptions));
-
-// Now, apply CORS for all other requests (GET, POST, etc.)
+// FIX: Apply CORS globally. This will automatically handle OPTIONS
+// pre-flight requests for all your defined routes.
 app.use(cors(corsOptions));
 
 // --- Core Middleware ---
@@ -29,7 +25,7 @@ app.use(express.json());
 app.use(cookieParser());
 
 // --- API Routes ---
-// These are correct. The full path is handled here.
+// These are correct. The backend is now responsible for the full path.
 app.use('/api/auth', authRoutes);
 app.use('/api/devices', deviceRoutes);
 app.use('/api/provision', provisionRoutes);
