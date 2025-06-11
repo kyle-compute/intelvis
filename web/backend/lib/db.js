@@ -1,17 +1,14 @@
-// /web/backend/lib/db.js
-
+// backend/lib/db.js
 import { PrismaClient } from '@prisma/client';
 
-// This prevents Prisma from creating new connections on every hot-reload in development.
-const prismaClientSingleton = () => {
-  return new PrismaClient();
-};
-
+// This pattern ensures that in a development environment (where module caching can be flushed),
+// you don't end up with a bunch of orphaned connections.
 const globalForPrisma = globalThis;
 
-// This ensures there is only one instance of Prisma Client.
-const prisma = globalForPrisma.prisma ?? prismaClientSingleton();
+const prisma = globalForPrisma.prisma || new PrismaClient();
+
+if (process.env.NODE_ENV !== 'production') {
+  globalForPrisma.prisma = prisma;
+}
 
 export default prisma;
-
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;

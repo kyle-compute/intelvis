@@ -1,7 +1,7 @@
+// backend/routes/provision.js
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
+import prisma from '../lib/db.js'; // <-- FIX: Import shared instance
 
-const prisma = new PrismaClient();
 const router = Router();
 const PROVISIONING_API_KEY = process.env.PROVISIONING_API_KEY;
 
@@ -11,19 +11,16 @@ const protectProvisioning = (req, res, next) => {
   if (apiKey && apiKey === PROVISIONING_API_KEY) {
     return next();
   }
-  // Log failed attempt for security monitoring
   console.warn(`[AUTH] Failed provision attempt from IP ${req.ip} with key: ${apiKey || 'none'}`);
   res.status(401).json({ message: 'Unauthorized' });
 };
 
 // POST /api/provision
-// Idempotent and case-insensitive provisioning endpoint.
 router.post('/', protectProvisioning, async (req, res, next) => {
   const { mac: rawMac } = req.body;
 
   if (!rawMac || typeof rawMac !== 'string' || rawMac.trim() === '') {
-    // Return a clear error for bad requests.
-    return res.status(400).json({ message: 'Field "mac" is required and must be a non-empty string.' });
+    return res.status(400).json({ message: 'Field "mac" is required.' });
   }
 
   const mac = rawMac.toLowerCase().trim();
@@ -34,27 +31,26 @@ router.post('/', protectProvisioning, async (req, res, next) => {
     });
 
     if (existingNic) {
-      console.log(`[PROVISION] Device with MAC ${mac} already exists. Responding 200 OK.`);
+      console.log(`[PROVISION] Device with MAC ${mac} already exists.`);
       return res.status(200).json({ message: 'Device already provisioned', deviceId: existingNic.deviceId });
     }
 
     console.log(`[PROVISION] New device. Creating entry for MAC ${mac}.`);
+    // This now works because `ownerId` is optional in the schema.
     const newDevice = await prisma.device.create({
       data: {
         status: 'INACTIVE',
-        parentId: null, // Satisfies database trigger
+        parentId: null,
         nic: {
           create: { mac },
         },
       },
     });
     
-    console.log(`[PROVISION] Successfully provisioned new device (ID: ${newDevice.id}) with MAC ${mac}.`);
+    console.log(`[PROVISION] Provisioned new device (ID: ${newDevice.id}) for MAC ${mac}.`);
     res.status(201).json({ message: 'Device provisioned successfully', deviceId: newDevice.id });
 
   } catch (error) {
-    // The key change: Pass the error to the global error handler in index.js
-    // It will log the full stack trace and send the 500 response.
     error.message = `Provisioning failed for MAC [${mac}]: ${error.message}`;
     next(error);
   }

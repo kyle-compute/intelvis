@@ -36,14 +36,15 @@ enum DeviceStatus {
 
 model Device {
   id        String   @id @default(cuid())
-  ownerId   String
-  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  // --- THIS IS THE FIX ---
+  // ownerId must be optional to allow provisioning before pairing.
+  ownerId   String?
+  owner     User?    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 
   parentId  String?
   parent    Device?  @relation("DeviceTree", fields: [parentId], references: [id], onDelete: NoAction, map: "device_parent_id_fkey")
   children  Device[] @relation("DeviceTree")
 
-  // This will be a TEXT column first. We will manually ALTER it to LTREE.
   path      String?  @db.Text
   alias     String?
   status    DeviceStatus @default(ACTIVE)
@@ -56,13 +57,11 @@ model Device {
   Telemetry Telemetry[]
 
   @@index([ownerId, status])
-  // The GiST index on `path` will be created manually via SQL after the column type is changed.
 }
 
 // ---------- TELEMETRY (TIME-SERIES DATA) ----------
 
 model Telemetry {
-  // The `id` column is removed.
   deviceId  String
   device    Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
   
@@ -71,9 +70,10 @@ model Telemetry {
   pressure  Float    @db.DoublePrecision
   payload   Json?
 
-  ownerId   String
+  // ownerId is denormalized for faster queries
+  ownerId   String?  // <-- Must also be made optional to match Device
 
-  @@id([deviceId, eventTs]) // <-- New composite primary key
-  @@index([deviceId, eventTs(sort: Desc)]) // Keep this for fast lookups
+  @@id([deviceId, eventTs])
+  @@index([deviceId, eventTs(sort: Desc)])
   @@index([ownerId, eventTs(sort: Desc)])
 }
