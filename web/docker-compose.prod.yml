@@ -1,5 +1,5 @@
-# docker-compose.prod.yml - FINAL & CORRECTED VERSION
-version: '3.8'
+# docker-compose.prod.yml - FINAL, MIGRATION-AWARE VERSION
+# The 'version' attribute is obsolete and has been removed as per Docker's recommendation.
 
 services:
   caddy:
@@ -17,7 +17,6 @@ services:
   frontend:
     build:
       context: ./frontend
-      # Docker Compose automatically makes variables from .env available for build args
       args:
         - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
     restart: unless-stopped
@@ -26,11 +25,11 @@ services:
   backend:
     build: ./backend
     restart: unless-stopped
-    expose: [3001]
     # --- THIS IS THE FIX ---
-    # We remove `env_file` and use the `environment` block instead.
-    # This ensures Docker Compose correctly substitutes the variables from your .env file
-    # before passing them to the container.
+    # This command first runs database migrations, then starts the server.
+    # It ensures the database schema is always in sync with your Prisma schema.
+    command: sh -c "npx prisma migrate deploy && node index.js"
+    expose: [3001]
     environment:
       - DATABASE_URL=${DATABASE_URL}
       - JWT_SECRET=${JWT_SECRET}
@@ -43,11 +42,10 @@ services:
   db:
     image: timescale/timescaledb:latest-pg16
     restart: unless-stopped
-    # This part is correct. It properly reads from your .env file.
     environment:
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_DB=${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - db_data:/var/lib/postgresql/data
     healthcheck:
