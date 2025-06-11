@@ -38,7 +38,7 @@ export default function DashboardPage() {
         } else {
           toast.error("Failed to fetch devices.");
         }
-      } catch (error) {
+      } catch  {
         toast.error("An error occurred while fetching devices.");
       } finally {
         setIsFetchingDevices(false);
@@ -74,7 +74,7 @@ export default function DashboardPage() {
       } else {
         toast.error(newDevice.message || "Failed to pair device.");
       }
-    } catch (error) {
+    } catch {
       toast.error("An error occurred during pairing.");
     } finally {
       setIsPairing(false);
