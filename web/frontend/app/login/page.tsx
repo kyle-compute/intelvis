@@ -1,16 +1,14 @@
-// frontend/app/login/page.tsx - THE FINAL, CORRECTED VERSION
+// frontend/app/login/page.tsx - SIMPLIFIED AND CORRECTED
 "use client"
 
 import { useState } from "react"
-// No longer need `useRouter` from next/navigation
-// No longer need `Link` from next/link (it's used below, re-add)
 import Link from "next/link"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
 import { Loader2 } from "lucide-react"
 import { toast } from "sonner"
-// No longer need `useAuth` because we are doing a hard redirect.
+import { useAuth } from "@/context/AuthContext" // Use our corrected context
 import { Button } from "@/components/ui/button"
 import {
   Form,
@@ -34,47 +32,24 @@ const formSchema = z.object({
   password: z.string().min(8, { message: "Password ≥ 8 characters." }),
 })
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
-
 export default function LoginPage() {
-  // We no longer need `useRouter` or `useAuth` here.
+  const { login } = useAuth() // Get the login function from the context
   const [isLoading, setIsLoading] = useState(false)
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
-    defaultValues: {
-      email: "",
-      password: "",
-    },
+    defaultValues: { email: "", password: "" },
   })
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    setIsLoading(true)
+    setIsLoading(true);
     try {
-      const response = await fetch(`${API_URL}/api/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(values),
-      })
-
-      const data = await response.json()
-
-      if (response.ok) {
-        // --- THIS IS THE FIX ---
-        // A hard redirect to the dashboard.
-        // This forces a full page load, which guarantees the browser has processed the
-        // Set-Cookie header from the login response before the dashboard page tries to
-        // fetch protected data. This completely eliminates the race condition.
-        window.location.href = "/dashboard";
-        
-        // On success, the page will reload, so we don't need to do anything else.
-        
-      } else {
-        toast.error(data.message || "Login failed. Please try again.")
-        setIsLoading(false); // Only stop loading on failure.
-      }
-    } catch {
-      toast.error("An error occurred. Please check your connection.")
+      // The login page's only job is to call the context's login method.
+      // The context will handle the fetch and the redirect.
+      await login(values.email, values.password);
+    } catch (error: any) {
+      // The context's login function throws an error on failure.
+      toast.error(error.message || "Login failed. Please try again.");
       setIsLoading(false);
     }
   }
