@@ -16,6 +16,8 @@ interface Device {
   createdAt: string;
 }
 
+// --- THIS IS THE FIX ---
+// The function must be the default export for a page component.
 export default function DashboardPage() {
   const { user, isLoading: isAuthLoading } = useAuth()
   const [devices, setDevices] = useState<Device[]>([])
@@ -43,7 +45,6 @@ export default function DashboardPage() {
     }
   }, [user, isAuthLoading]);
 
-  // This function adds the new device to the state, forcing a re-render.
   const handleDeviceAdded = (newDevice: Device) => {
     setDevices(prevDevices => [newDevice, ...prevDevices]);
   };
@@ -62,13 +63,10 @@ export default function DashboardPage() {
         <h1 className="text-3xl font-bold">Welcome, {user.email}</h1>
         <p className="text-muted-foreground">Your device dashboard.</p>
       </div>
-
       <div className="grid gap-6 md:grid-cols-3">
         <div className="md:col-span-1">
-          {/* --- THE FIX: Pass the callback function to the form component --- */}
           <AddDeviceForm onDeviceAdded={handleDeviceAdded} />
         </div>
-        
         <div className="md:col-span-2">
             <h2 className="text-2xl font-semibold mb-4">Your Devices</h2>
             {isDeviceLoading ? (
@@ -82,7 +80,6 @@ export default function DashboardPage() {
                         <Card key={device.id}>
                             <CardHeader>
                                 <CardTitle>{device.alias || `Device`}</CardTitle>
-                                {/* Use optional chaining for safety */}
                                 <CardDescription>MAC: {device.nic?.mac || 'N/A'}</CardDescription>
                             </CardHeader>
                             <CardContent>
