@@ -1,20 +1,30 @@
-# frontend/Dockerfile
-
-# 1. Use an official Node.js image
-FROM node:20-alpine
-
-# 2. Set the working directory
+# ---- Base ----
+FROM node:20-alpine AS base
 WORKDIR /app
 
-# 3. Copy package files and install dependencies
-COPY package*.json ./
-RUN npm install
+# ---- Dependencies ----
+# This now copies package-lock.json and uses 'npm ci'
+FROM base AS deps
+COPY package.json package-lock.json* ./
+RUN npm ci
 
-# 4. Copy the rest of the frontend code
+# ---- Builder ----
+FROM base AS builder
+COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+ENV NODE_ENV production
+RUN npm run build
 
-# 5. Expose the port for the dev server
+# ---- Runner ----
+FROM base AS runner
+WORKDIR /app
+ENV NODE_ENV production
+
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+
 EXPOSE 3000
+ENV PORT 3000
 
-# 6. Command to start the dev server
-CMD ["npm", "run", "dev"]
+CMD ["node", "server.js"]
