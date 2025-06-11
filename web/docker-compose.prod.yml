@@ -1,4 +1,4 @@
-# docker-compose.prod.yml - THE FINAL & MOST ROBUST VERSION
+# docker-compose.prod.yml - FINAL & CORRECTED VERSION
 
 version: '3.8'
 
@@ -11,26 +11,27 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile
       - caddy_data:/data
       - caddy_config:/config
-    depends_on: [frontend, backend]
-    # FIX: Load all variables directly from the .env file.
+    depends_on:
+      - frontend
+      - backend
     env_file: ./.env
 
   frontend:
     build:
       context: ./frontend
-      # FIX: Pass the build argument directly from the .env file.
+      # This correctly passes the API URL at BUILD TIME from the .env file.
       args:
         - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
     restart: unless-stopped
     expose: [3000]
-    # FIX: Load all variables directly from the .env file.
-    env_file: ./.env
+    # NOTE: No `env_file` here. This service needs no runtime secrets,
+    # which fixes the 502 Bad Gateway crash.
 
   backend:
     build: ./backend
     restart: unless-stopped
     expose: [3001]
-    # FIX: Load all variables directly from the .env file.
+    # This correctly injects secrets at RUNTIME.
     env_file: ./.env
     depends_on:
       db:
@@ -39,7 +40,7 @@ services:
   db:
     image: timescale/timescaledb:latest-pg16
     restart: unless-stopped
-    # FIX: Load all variables directly from the .env file.
+    # This correctly injects user/pass credentials at RUNTIME.
     env_file: ./.env
     volumes:
       - db_data:/var/lib/postgresql/data
