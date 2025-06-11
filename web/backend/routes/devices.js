@@ -1,93 +1,66 @@
-// backend/routes/devices.js
 import { Router } from 'express';
-import { protect } from '../middleware/protect.js'; // Use our auth gatekeeper
-import prisma from '../lib/db.js';
+import { PrismaClient } from '@prisma/client';
+import { protect } from '../middleware/protect.js';
 
+const prisma = new PrismaClient();
 const router = Router();
 
-// @desc    Register a new device to the logged-in user by its MAC address
-// @route   POST /api/devices// backend/routes/devices.js
+// All device routes are protected. A user must be logged in.
+router.use(protect);
 
-// ... keep your import statements and the router.get(...) route ...
-router.get('/', protect, async (req, res) => {
-  const ownerId = req.user.id; // The 'protect' middleware gives us this
-
+// GET /api/devices
+// Fetches all devices linked to the currently logged-in user.
+router.get('/', async (req, res) => {
   try {
     const devices = await prisma.device.findMany({
-      where: {
-        ownerId: ownerId,
-      },
-      // We must also fetch the related Nic to get the MAC address for display
-      include: {
-        nic: {
-          select: {
-            mac: true,
-          },
-        },
-      },
-      orderBy: {
-        createdAt: 'desc', // Show newest devices first
-      },
+      where: { ownerId: req.user.id },
+      include: { nic: true }, // Include the MAC address
     });
     res.status(200).json(devices);
   } catch (error) {
-    console.error('Error fetching devices:', error);
-    res.status(500).json({ message: 'Server error while fetching devices' });
+    console.error('Failed to fetch devices:', error);
+    res.status(500).json({ message: 'Error fetching devices' });
   }
 });
 
-router.post('/', protect, async (req, res) => {
+// POST /api/devices
+// Pairs a new device with the logged-in user using its MAC address.
+router.post('/', async (req, res) => {
   const { mac } = req.body;
-  const ownerId = req.user.id;
-
   if (!mac) {
     return res.status(400).json({ message: 'MAC address is required' });
   }
 
   try {
-    const normalizedMac = mac.toLowerCase();
-
-    // 1. Find the physical hardware (Nic)
-    const nic = await prisma.nic.findUnique({
-      where: { mac: normalizedMac },
-    });
+    // 1. Find the NetworkInterfaceCard (NIC) by its MAC address.
+    const nic = await prisma.networkInterfaceCard.findUnique({ where: { mac } });
 
     if (!nic) {
-      return res.status(404).json({ message: 'Device not provisioned. Please restart your physical device.' });
+      return res.status(404).json({ message: 'Device with this MAC not found' });
     }
 
-    // --- THIS IS THE CRITICAL FIX ---
-    // 2. Explicitly check if the Nic is already claimed BEFORE starting a transaction.
-    if (nic.deviceId) {
-      return res.status(409).json({ message: 'This device has already been claimed.' });
+    // 2. Check if the device it belongs to is already owned.
+    const device = await prisma.device.findUnique({ where: { id: nic.deviceId } });
+
+    if (!device) {
+        return res.status(404).json({ message: 'Device not found for this MAC' });
     }
-    // --- END OF FIX ---
 
-    // 3. If we get here, the Nic is available. Claim it.
-    const newDeviceWithNic = await prisma.$transaction(async (tx) => {
-      const createdDevice = await tx.device.create({
-        data: {
-          ownerId: ownerId,
-          alias: `Device ${normalizedMac.slice(-5)}`,
-        },
-      });
+    if (device.ownerId) {
+      return res.status(409).json({ message: 'Device is already paired to an account' });
+    }
 
-      await tx.nic.update({
-        where: { id: nic.id },
-        data: { deviceId: createdDevice.id },
-      });
-
-      return tx.device.findUnique({
-        where: { id: createdDevice.id },
-        include: { nic: { select: { mac: true } } },
-      });
+    // 3. Assign the device to the current user.
+    const updatedDevice = await prisma.device.update({
+      where: { id: device.id },
+      data: { ownerId: req.user.id },
+      include: { nic: true },
     });
 
-    res.status(201).json(newDeviceWithNic);
-
+    res.status(201).json(updatedDevice);
   } catch (error) {
-    console.error('Error adding device:', error);
-    res.status(500).json({ message: 'Server error during device claim.' });
+    console.error('Failed to pair device:', error);
+    res.status(500).json({ message: 'Error pairing device' });
   }
 });
 
