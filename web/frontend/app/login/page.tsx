@@ -1,4 +1,4 @@
-// frontend/app/login/page.tsx - SIMPLIFIED AND CORRECTED
+// frontend/app/login/page.tsx - FINAL, LINTED, AND CORRECTED
 "use client"
 
 import { useState } from "react"
@@ -8,7 +8,7 @@ import { useForm } from "react-hook-form"
 import * as z from "zod"
 import { Loader2 } from "lucide-react"
 import { toast } from "sonner"
-import { useAuth } from "@/context/AuthContext" // Use our corrected context
+import { useAuth } from "@/context/AuthContext"
 import { Button } from "@/components/ui/button"
 import {
   Form,
@@ -33,7 +33,7 @@ const formSchema = z.object({
 })
 
 export default function LoginPage() {
-  const { login } = useAuth() // Get the login function from the context
+  const { login } = useAuth()
   const [isLoading, setIsLoading] = useState(false)
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -44,12 +44,14 @@ export default function LoginPage() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
     try {
-      // The login page's only job is to call the context's login method.
-      // The context will handle the fetch and the redirect.
       await login(values.email, values.password);
-    } catch (error: any) {
-      // The context's login function throws an error on failure.
-      toast.error(error.message || "Login failed. Please try again.");
+    } catch (error) { // <-- THIS IS THE CORRECT, TYPE-SAFE FIX
+      let errorMessage = "An unknown login error occurred.";
+      if (error instanceof Error) {
+        // Now that we've confirmed it's an Error object, we can safely access .message
+        errorMessage = error.message;
+      }
+      toast.error(errorMessage);
       setIsLoading(false);
     }
   }
