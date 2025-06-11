@@ -1,34 +1,57 @@
 import { Router } from 'express';
-import prisma from '../lib/db.js';
-import { protectProvision } from '../middleware/protectProvision.js';
+import { PrismaClient } from '@prisma/client';
 
+const prisma = new PrismaClient();
 const router = Router();
+const PROVISIONING_API_KEY = process.env.PROVISIONING_API_KEY;
 
-// @desc    A device provisions itself by sending its MAC address
-// @route   POST /api/provision
-// @access  Protected by API Key
-router.post('/', protectProvision, async (req, res) => {
+// Middleware to protect the provisioning endpoint with a static API key
+const protectProvisioning = (req, res, next) => {
+  const apiKey = req.get('X-API-Key');
+  if (apiKey && apiKey === PROVISIONING_API_KEY) {
+    next();
+  } else {
+    res.status(401).json({ message: 'Unauthorized: Invalid or missing API Key' });
+  }
+};
+
+// POST /api/provision
+// This endpoint is now idempotent. It can be called multiple times without error.
+router.post('/', protectProvisioning, async (req, res) => {
   const { mac } = req.body;
-
   if (!mac) {
     return res.status(400).json({ message: 'MAC address is required' });
   }
 
-  const normalizedMac = mac.toLowerCase();
-
   try {
-    // Use `upsert`: create if it doesn't exist, do nothing if it does.
-    // This makes the endpoint robust and safe to call multiple times.
-    const nic = await prisma.nic.upsert({
-      where: { mac: normalizedMac },
-      update: {}, // Nothing to update if it already exists
-      create: { mac: normalizedMac },
+    // 1. Check if a device with this MAC already exists.
+    const existingNic = await prisma.networkInterfaceCard.findUnique({
+      where: { mac },
+      include: { device: true }, // Also get the parent device
     });
 
-    res.status(200).json({ message: 'Device provisioned successfully', mac: nic.mac });
+    if (existingNic) {
+      // 2. If it exists, it's already provisioned. Return the existing device data.
+      console.log(`Device with MAC ${mac} already provisioned. Returning existing data.`);
+      return res.status(200).json(existingNic.device); // Use 200 OK, not 201 Created
+    }
+
+    // 3. If it does not exist, create it.
+    console.log(`New device with MAC ${mac}. Provisioning...`);
+    const newDevice = await prisma.device.create({
+      data: {
+        status: 'INACTIVE',
+        nic: {
+          create: { mac },
+        },
+      },
+    });
+    res.status(201).json(newDevice); // Use 201 Created for a new resource
+
   } catch (error) {
-    console.error('Provisioning error:', error);
-    res.status(500).json({ message: 'Server error during provisioning' });
+    // This will catch any other unexpected database errors.
+    console.error('Error during provisioning:', error);
+    res.status(500).json({ message: 'Internal Server Error during provisioning' });
   }
 });
 
