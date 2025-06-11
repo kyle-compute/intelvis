@@ -1,35 +1,10 @@
-# ---- FRONT-END -------------------------------------------------
-intelvis.ai, www.intelvis.ai {
-	encode gzip zstd
+# Caddyfile - THE FINAL, SIMPLIFIED VERSION
 
-	# serve Next.js frontend container
-	reverse_proxy frontend:3000
-
-	# proxy any /api/* request to backend
-	handle_path /api/* {
-		reverse_proxy backend:3001
-		header Access-Control-Allow-Origin      *
-		header Access-Control-Allow-Methods     "GET,POST,PUT,PATCH,DELETE,OPTIONS"
-		header Access-Control-Allow-Headers     *
-		header Access-Control-Allow-Credentials true
-	}
-
-	# pre-flight
-	@options method OPTIONS
-	respond @options 204
+intelvis.ai {
+    reverse_proxy frontend:3000
 }
 
-# ---- BACK-END (direct sub-domain) ------------------------------
 api.intelvis.ai {
-	encode gzip zstd
-
-	reverse_proxy backend:3001
-
-	header Access-Control-Allow-Origin      *
-	header Access-Control-Allow-Methods     "GET,POST,PUT,PATCH,DELETE,OPTIONS"
-	header Access-Control-Allow-Headers     *
-	header Access-Control-Allow-Credentials true
-
-	@options method OPTIONS
-	respond @options 204
+    # Simple, clean proxy pass. The backend handles the full /api path.
+    reverse_proxy backend:3001
 }
