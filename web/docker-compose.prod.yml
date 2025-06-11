@@ -1,4 +1,4 @@
-# docker-compose.prod.yml - Aligned with the new .env format
+# docker-compose.prod.yml - FINAL & CORRECTED
 
 version: '3.8'
 
@@ -12,7 +12,6 @@ services:
       - caddy_data:/data
       - caddy_config:/config
     depends_on: [frontend, backend]
-    # Pass the domain name into the Caddy container
     environment:
       - DOMAIN_NAME=${DOMAIN_NAME}
 
@@ -22,6 +21,9 @@ services:
     expose: [3000]
     environment:
       - NODE_ENV=production
+      # FIX: Pass the public API URL to the frontend so it knows where to send requests.
+      # The value comes from the .env file variable 'DOMAIN_NAME'.
+      - NEXT_PUBLIC_API_URL=https://api.${DOMAIN_NAME}
 
   backend:
     build: ./backend
@@ -29,7 +31,6 @@ services:
     expose: [3001]
     environment:
       - NODE_ENV=production
-      # FIX: This now directly uses DATABASE_URL from the .env file.
       - DATABASE_URL=${DATABASE_URL}
       - PORT=3001
       - JWT_SECRET=${JWT_SECRET}

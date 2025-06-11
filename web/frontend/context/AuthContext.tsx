@@ -1,18 +1,16 @@
-// frontend/context/AuthContext.tsx
+// frontend/context/AuthContext.tsx - FINAL & CORRECTED
 
 "use client"
 
 import { createContext, useContext, useState, useEffect, ReactNode } from "react"
 import { useRouter } from "next/navigation"
 
-// Define the shape of the user object
 interface User {
   id: string
   email: string
   createdAt: string
 }
 
-// Define the shape of the context value
 interface AuthContextType {
   user: User | null
   isLoading: boolean
@@ -22,16 +20,19 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
+// FIX: Define the API URL from the environment variable.
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
-  const [isLoading, setIsLoading] = useState(true) // Start loading to check for a session
+  const [isLoading, setIsLoading] = useState(true)
   const router = useRouter()
 
-  // On initial load, check if the user has a valid session cookie
   useEffect(() => {
     const checkUserStatus = async () => {
       try {
-        const response = await fetch("/api/auth/me")
+        // FIX: Use the full, absolute path to the API.
+        const response = await fetch(`${API_URL}/api/auth/me`)
         if (response.ok) {
           const userData = await response.json()
           setUser(userData)
@@ -53,10 +54,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     try {
-      await fetch("/api/auth/logout", { method: "POST" })
+      // FIX: Use the full, absolute path to the API.
+      await fetch(`${API_URL}/api/auth/logout`, { method: "POST" })
     } finally {
       setUser(null)
-      // Redirect to login page after logging out
       router.push("/login")
     }
   }
@@ -68,7 +69,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   )
 }
 
-// Custom hook to use the AuthContext
 export const useAuth = () => {
   const context = useContext(AuthContext)
   if (context === undefined) {

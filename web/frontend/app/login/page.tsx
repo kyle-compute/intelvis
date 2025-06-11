@@ -1,4 +1,4 @@
-// app/(auth)/login/page.tsx
+// frontend/app/(auth)/login/page.tsx - FINAL & CORRECTED
 "use client"
 
 import { useState } from "react"
@@ -33,9 +33,12 @@ const formSchema = z.object({
   password: z.string().min(8, { message: "Password ≥ 8 characters." }),
 })
 
+// FIX: Get the API URL from the environment variable.
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
+
 export default function LoginPage() {
   const router = useRouter()
-  const { login } = useAuth() // <-- ADD THIS LINE to get the login function from context
+  const { login } = useAuth()
   const [isLoading, setIsLoading] = useState(false)
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -46,10 +49,11 @@ export default function LoginPage() {
     },
   })
 
-async function onSubmit(values: z.infer<typeof formSchema>) {
+  async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true)
     try {
-      const response = await fetch("/api/auth/login", {
+      // FIX: Use the full, absolute path to the API.
+      const response = await fetch(`${API_URL}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(values),
@@ -58,7 +62,7 @@ async function onSubmit(values: z.infer<typeof formSchema>) {
       const data = await response.json()
 
       if (response.ok) {
-        login(data) // Update the global auth state
+        login(data)
         toast.success("Logged in successfully.")
         router.push("/dashboard")
       } else {
@@ -78,7 +82,6 @@ async function onSubmit(values: z.infer<typeof formSchema>) {
           <CardTitle className="text-2xl">Log in</CardTitle>
           <CardDescription>Enter your credentials.</CardDescription>
         </CardHeader>
-
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -101,7 +104,6 @@ async function onSubmit(values: z.infer<typeof formSchema>) {
                   </FormItem>
                 )}
               />
-
               <FormField
                 control={form.control}
                 name="password"
@@ -121,7 +123,6 @@ async function onSubmit(values: z.infer<typeof formSchema>) {
                   </FormItem>
                 )}
               />
-
               <Button
                 type="submit"
                 className="w-full"
@@ -132,7 +133,6 @@ async function onSubmit(values: z.infer<typeof formSchema>) {
               </Button>
             </form>
           </Form>
-
           <div className="mt-4 text-center text-sm">
             Need an account?{" "}
             <Link
