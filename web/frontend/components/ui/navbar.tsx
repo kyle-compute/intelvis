@@ -51,8 +51,8 @@ export function Navbar() {
       return isMobile ? null : <div className="h-9 w-[150px]" />;
     }
     
-    if (isLoading) {
-      return <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />;
+   if (isLoading) {
+      return <div className="h-9 w-[150px] bg-gray-800 rounded-md animate-pulse" />;
     }
     
     if (user) {

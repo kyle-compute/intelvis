@@ -1,5 +1,7 @@
 // frontend/app/page.tsx
 import { Metadata } from 'next';
+
+// Import all your landing page sections
 import { HeroSection } from "@/components/landing/HeroSection";
 import { HowItWorksSection } from "@/components/landing/HowItWorksSection";
 import { CtaFormSection } from "@/components/landing/CtaFormSection";
@@ -12,9 +14,9 @@ export const metadata: Metadata = {
   description: "IntelVis finds compressed air leaks before they cost you thousands. Simple sensors, real-time alerts. No audits needed. Get early access.",
 };
 
+// This is now your root page component
 export default function LandingPage() {
   return (
-    // Set the single, unified background color for the entire page
     <div className="bg-black text-white">
       <main id="main-content">
         <HeroSection />
