@@ -12,14 +12,19 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 
-// Validation schema for a MAC address
 const formSchema = z.object({
   mac: z.string().regex(/^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/, {
     message: "Enter a valid MAC address (e.g., AA:BB:CC:DD:EE:FF)",
   }),
 })
 
-export function AddDeviceForm() {
+// --- STEP 1: Define the props the component accepts ---
+interface AddDeviceFormProps {
+  onDeviceAdded: (device: any) => void; // It expects a function
+}
+
+// --- STEP 2: Accept the props ---
+export function AddDeviceForm({ onDeviceAdded }: AddDeviceFormProps) {
   const [isLoading, setIsLoading] = useState(false)
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -42,10 +47,12 @@ export function AddDeviceForm() {
 
       if (response.ok) {
         toast.success("Device paired successfully!")
-        form.reset() // Clear the form on success
-        // Here you would typically trigger a refresh of the device list
+        form.reset()
+        
+        // --- STEP 3: Call the parent's function with the new device data ---
+        onDeviceAdded(data);
+
       } else {
-        // Give specific error messages from the backend
         toast.error(data.message || "Pairing failed.")
       }
     } catch (error) {
