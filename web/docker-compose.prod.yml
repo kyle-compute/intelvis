@@ -23,18 +23,12 @@ services:
     expose: [3000]
 
   backend:
-    build: ./backend
+    build:
+      context: ./backend
+      dockerfile: Dockerfile # Use the Dockerfile we just created
     restart: unless-stopped
-    # --- THIS IS THE FIX ---
-    # This command first runs database migrations, then starts the server.
-    # It ensures the database schema is always in sync with your Prisma schema.
-    command: sh -c "npx prisma migrate deploy && node index.js"
     expose: [3001]
-    environment:
-      - DATABASE_URL=${DATABASE_URL}
-      - JWT_SECRET=${JWT_SECRET}
-      - PROVISIONING_API_KEY=${PROVISIONING_API_KEY}
-      - NODE_ENV=${NODE_ENV}
+    env_file: ./.env
     depends_on:
       db:
         condition: service_healthy
