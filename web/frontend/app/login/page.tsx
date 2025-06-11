@@ -64,7 +64,7 @@ async function onSubmit(values: z.infer<typeof formSchema>) {
       } else {
         toast.error(data.message || "Login failed. Please try again.")
       }
-    } catch (error) {
+    } catch {
       toast.error("An error occurred. Please check your connection.")
     } finally {
       setIsLoading(false)

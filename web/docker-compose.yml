@@ -1,60 +1,42 @@
 
-
 services:
-  # 1. The Database Service
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    environment:
+      - NODE_ENV=development
+
+  backend:
+    build: ./backend
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=${DATABASE_URL}
+      - JWT_SECRET=${JWT_SECRET}
+      - PROVISIONING_API_KEY=${PROVISIONING_API_KEY}
+    depends_on:
+      - db
+
   db:
-    image: timescale/timescaledb:latest-pg16
-    container_name: iot-db
-    restart: always
+    image: postgres:15-alpine
+    restart: unless-stopped
+    ports:
+      - "5432:5432" # Expose DB port for local tools if needed
     environment:
       - POSTGRES_USER=user
       - POSTGRES_PASSWORD=password
       - POSTGRES_DB=mydb
-    ports:
-      - '5432:5432'
     volumes:
-      - db_data:/var/lib/postgresql/data
-    # --- ADD THIS BLOCK ---
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U user -d mydb"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  # 2. The Backend Service
-  backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    container_name: iot-backend
-    restart: always
-    ports:
-      - '3001:3001'
-    # --- MODIFY THIS BLOCK ---
-    depends_on:
-      db:
-        condition: service_healthy # Wait for the healthcheck to pass
-    environment:
-      - DATABASE_URL=${DATABASE_URL_DOCKER}
-      - JWT_SECRET=${JWT_SECRET}
-      - PROVISIONING_API_KEY=${PROVISIONING_API_KEY}
-    volumes:
-      - ./backend:/app
-      - /app/node_modules
-  frontend:
-    build:
-      context: ./frontend # Assumes your frontend code is in a 'frontend' folder
-      dockerfile: Dockerfile
-    container_name: iot-frontend
-    restart: always
-    ports:
-      - '3000:3000' # Expose the web app on port 3000
-    depends_on:
-      - backend # Good practice to wait for the backend
-    volumes:
-      # Mount your frontend code for live reloading
-      - ./frontend:/app
-      - /app/node_modules
+      - db_data_local:/var/lib/postgresql/data
 
 volumes:
-  db_data: # This volume persists your database data even if the container is removed
+  db_data_local:

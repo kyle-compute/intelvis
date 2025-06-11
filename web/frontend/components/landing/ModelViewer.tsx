@@ -1,25 +1,38 @@
 // frontend/components/landing/ModelViewer.tsx
-"use client";
-import '@google/model-viewer';
+'use client';
 
-export function ModelViewer() {
+import { Canvas } from '@react-three/fiber';
+import { useGLTF, OrbitControls, Environment } from '@react-three/drei';
+import { Suspense, ComponentProps } from 'react';
+
+type ModelProps = Omit<ComponentProps<'primitive'>, 'object'>;
+
+function Model(props: ModelProps) {
+  const { scene } = useGLTF('/assets/sensor.glb');
+  return <primitive object={scene} {...props} />;
+}
+
+export default function ModelViewer() {
   return (
-    // --- LAYOUT FIX: Main container with the EXACT SAME height and flex layout ---
-    <div className="w-full flex flex-col h-[480px]">
-      <h3 className="text-xl font-semibold mb-4 text-gray-100 text-center">Durable, Mountable Enclosure (3D)</h3>
-      {/* --- LAYOUT FIX: This container now fills the remaining space --- */}
-      <div className="w-full flex-1 rounded-xl border border-gray-800 p-2 bg-gray-950 shadow-2xl">
-        <model-viewer
-          src="/assets/sensor.glb"
-          poster="/assets/intelvis-poster.jpg"
-          alt="Interactive 3D model of the IntelVis sensor"
-          auto-rotate
-          camera-controls
-          shadow-intensity="1"
-          // --- LAYOUT FIX: Style is now 100% to fill its parent div ---
-          style={{ width: '100%', height: '100%', backgroundColor: 'transparent' }}
-        ></model-viewer>
+    <div className="flex h-full w-full flex-col">
+      <h3 className="mb-4 text-center text-xl font-semibold text-gray-100">Interactive 3D Model</h3>
+      {/*
+        FIX: Removed `flex-1` from the container and applied `aspect-[4/3]`.
+        This makes it perfectly match the carousel's size and responsiveness.
+      */}
+      <div className="aspect-[4/3] w-full rounded-xl border border-gray-800 bg-gray-950 p-2 shadow-2xl">
+        <Canvas camera={{ position: [0, 0, 7], fov: 50 }}>
+          <Suspense fallback={null}>
+            <ambientLight intensity={0.5} />
+            <directionalLight position={[10, 10, 5]} intensity={1.5} />
+            <Model scale={1.5} />
+            <Environment preset="city" />
+          </Suspense>
+          <OrbitControls autoRotate autoRotateSpeed={0.5} enableZoom={true} />
+        </Canvas>
       </div>
     </div>
   );
 }
+
+useGLTF.preload('/assets/sensor.glb');

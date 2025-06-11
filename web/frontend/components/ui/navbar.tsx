@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { Loader2, Menu } from "lucide-react"
+import { Menu } from "lucide-react"
 import { useState, useEffect } from "react"
 import { useAuth } from "@/context/AuthContext"
 

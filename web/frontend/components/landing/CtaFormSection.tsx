@@ -51,7 +51,7 @@ export function CtaFormSection() {
         // Handle server-side errors from Formspree
         toast.error("Submission failed. Please try again later.");
       }
-    } catch (error) {
+    } catch {
       // Handle network errors
       toast.error("A network error occurred. Please check your connection.");
     }
