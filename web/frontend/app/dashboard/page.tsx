@@ -1,4 +1,4 @@
-// frontend/app/dashboard/page.tsx - FINAL & CORRECTED VERSION
+// frontend/app/dashboard/page.tsx - THE FINAL & CORRECTED VERSION
 "use client"
 
 import { useState, useEffect } from "react"
@@ -17,24 +17,28 @@ interface Device {
 }
 
 export default function DashboardPage() {
-  const { user, isLoading: authIsLoading } = useAuth()
+  const { user, isLoading: authIsLoading, logout } = useAuth()
   const [devices, setDevices] = useState<Device[]>([])
   const [macAddress, setMacAddress] = useState("")
   const [isPairing, setIsPairing] = useState(false)
   const [isFetchingDevices, setIsFetchingDevices] = useState(true)
 
-  // Fetch devices when the component loads and the user is available
+  // Fetch devices when the component loads, BUT ONLY if auth is finished and we have a user.
   useEffect(() => {
     const fetchDevices = async () => {
-      // Don't fetch if auth is still loading or if there's no user
+      // THIS IS THE CRITICAL FIX:
+      // 1. Wait for auth to be done loading.
+      // 2. Ensure we actually have a logged-in user.
       if (authIsLoading || !user) {
-        setIsFetchingDevices(false);
+        // If auth is loading, do nothing yet. If it's done and there's no user, stop.
+        if (!authIsLoading) {
+            setIsFetchingDevices(false);
+        }
         return;
       }
 
       setIsFetchingDevices(true);
       try {
-        // FIX: Add `credentials: 'include'` to send the auth cookie.
         const response = await fetch(`${API_URL}/api/devices`, {
           credentials: 'include'
         });
@@ -42,10 +46,13 @@ export default function DashboardPage() {
         if (response.ok) {
           const data = await response.json();
           setDevices(data);
+        } else if (response.status === 401) {
+          toast.error("Your session has expired. Please log in again.");
+          logout(); // Use the logout function from context to clean up and redirect
         } else {
-          toast.error("Failed to fetch devices. Your session may have expired.");
+          toast.error("Failed to fetch devices.");
         }
-      } catch {
+      } catch{
         toast.error("An error occurred while fetching devices.");
       } finally {
         setIsFetchingDevices(false);
@@ -53,7 +60,7 @@ export default function DashboardPage() {
     };
 
     fetchDevices();
-  }, [user, authIsLoading]);
+  }, [user, authIsLoading, logout]); // Add logout to the dependency array
 
   const handlePairDevice = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,7 +70,6 @@ export default function DashboardPage() {
     }
     setIsPairing(true);
     try {
-      // FIX: Add `credentials: 'include'` to send the auth cookie.
       const response = await fetch(`${API_URL}/api/devices`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -75,12 +81,12 @@ export default function DashboardPage() {
 
       if (response.ok) {
         toast.success("Device paired successfully!");
-        // Re-fetch devices to get the latest list including the new one
-        const fetchResponse = await fetch(`${API_URL}/api/devices`, { credentials: 'include' });
-        if (fetchResponse.ok) {
-          setDevices(await fetchResponse.json());
-        }
+        // A simple way to refresh the list is to add the new device directly
+        setDevices(prevDevices => [...prevDevices, newDevice]);
         setMacAddress("");
+      } else if (response.status === 401) {
+         toast.error("Your session has expired. Please log in again.");
+         logout();
       } else {
         toast.error(newDevice.message || "Failed to pair device.");
       }
@@ -95,9 +101,15 @@ export default function DashboardPage() {
     return <div className="p-8 text-center text-gray-500">Authenticating...</div>;
   }
 
+  // If auth is done and there's still no user, don't render the dashboard.
+  // You could redirect here, but the AuthContext should handle that.
+  if (!user) {
+    return <div className="p-8 text-center text-gray-500">Please log in to view your dashboard.</div>;
+  }
+
   return (
     <div className="p-4 sm:p-8 max-w-4xl mx-auto">
-      <h1 className="text-3xl font-bold mb-2">Welcome, {user?.email}</h1>
+      <h1 className="text-3xl font-bold mb-2">Welcome, {user.email}</h1>
       <p className="text-gray-400 mb-8">Your device dashboard.</p>
 
       <div className="grid md:grid-cols-3 gap-8">
