@@ -1,22 +1,24 @@
-// backend/routes/auth.js
-
+// backend/routes/auth.js - THE FINAL & CORRECTED VERSION
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import prisma from '../lib/db.js'; // This is the only prisma import you need
+import { PrismaClient } from '@prisma/client';
 import { protect } from '../middleware/protect.js';
 
+const prisma = new PrismaClient();
 const router = Router();
-
 const JWT_SECRET = process.env.JWT_SECRET;
 const COOKIE_NAME = 'authToken';
 
 const setTokenCookie = (res, token) => {
   res.cookie(COOKIE_NAME, token, {
     httpOnly: true,
+    // In production, cookies MUST be secure to be sent cross-site.
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
-    maxAge: 7 * 24 * 60 * 60 * 1000,
+    // THIS IS THE FIX: 'none' is required for cross-domain cookies.
+    sameSite: 'none',
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    path: '/',
   });
 };
 
@@ -53,8 +55,8 @@ router.get('/me', protect, (req, res) => {
 });
 
 router.post('/logout', (req, res) => {
-  res.cookie(COOKIE_NAME, '', { httpOnly: true, expires: new Date(0) });
-  res.status(200).json({ message: 'Logged out' });
+  res.cookie(COOKIE_NAME, '', { httpOnly: true, expires: new Date(0), secure: process.env.NODE_ENV === 'production', sameSite: 'none', path: '/' });
+  res.status(200).json({ message: 'Logged out successfully' });
 });
 
 export default router;

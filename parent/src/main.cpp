@@ -6,8 +6,8 @@ const char* ssid = "Homewifi_2.4G";
 const char* password = "9sophie2011";
 
 // Your server details
-const char* serverName = "http://192.168.254.76:3001/api/provision";
-const char* apiKey = "a-very-strong-and-random-secret-key-for-devices";
+const char* serverName = "https://api.intelvis.ai/api/provision";
+const char* apiKey = "ANOTHER_SUPER_STRONG_RANDOM_KEY";
 
 
 void provisionDevice() {
