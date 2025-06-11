@@ -1,10 +1,10 @@
-// frontend/app/dashboard/page.tsx - THE FINAL & COMPLETE VERSION
+// frontend/app/dashboard/page.tsx - THE FINAL & CORRECTED VERSION
 "use client"
 
 import { useState, useEffect } from "react"
 import { useAuth } from "@/context/AuthContext"
 import { toast } from "sonner"
-import { Loader2 } from "lucide-react" // This is now used in the JSX
+import { Loader2 } from "lucide-react"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -30,7 +30,10 @@ export default function DashboardPage() {
       }
       setIsFetchingDevices(true);
       try {
-        const response = await fetch(`${API_URL}/api/devices`, { credentials: 'include' });
+        // THIS IS THE FIX: Tell the browser to send the auth cookie.
+        const response = await fetch(`${API_URL}/api/devices`, {
+          credentials: 'include'
+        });
         if (response.ok) {
           setDevices(await response.json());
         } else if (response.status === 401) {
@@ -39,9 +42,7 @@ export default function DashboardPage() {
         } else {
           toast.error("Failed to fetch devices.");
         }
-      } catch (error) {
-        // FIX: Use the 'error' variable so ESLint is happy.
-        console.error("An error occurred while fetching devices:", error);
+      } catch {
         toast.error("An error occurred while fetching devices.");
       } finally {
         setIsFetchingDevices(false);
@@ -58,6 +59,7 @@ export default function DashboardPage() {
     }
     setIsPairing(true);
     try {
+      // THIS IS THE FIX: Tell the browser to send the auth cookie.
       const response = await fetch(`${API_URL}/api/devices`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -75,28 +77,23 @@ export default function DashboardPage() {
       } else {
         toast.error(newDevice.message || "Failed to pair device.");
       }
-    } catch (error) {
-      // FIX: Use the 'error' variable so ESLint is happy.
-      console.error("An error occurred during pairing:", error);
+    } catch {
       toast.error("An error occurred during pairing.");
     } finally {
       setIsPairing(false);
     }
   };
 
-  // This is the component's render logic. It uses all the state variables.
   if (authIsLoading) {
-    return <div className="p-8 text-center text-gray-500">Authenticating...</div>;
+    return <div className="p-8 text-center">Authenticating...</div>;
   }
   if (!user) {
-    return <div className="p-8 text-center text-gray-500">Redirecting to login...</div>;
+    // This will briefly show before the context redirects
+    return <div className="p-8 text-center">Redirecting to login...</div>;
   }
 
   return (
     <div className="p-4 sm:p-8 max-w-4xl mx-auto">
-      <h1 className="text-3xl font-bold mb-2">Welcome, {user.email}</h1>
-      <p className="text-gray-400 mb-8">Your device dashboard.</p>
-
       <div className="grid md:grid-cols-3 gap-8">
         <div className="md:col-span-1">
           <div className="bg-gray-900 p-6 rounded-lg shadow-lg">

@@ -1,4 +1,4 @@
-// frontend/context/AuthContext.tsx - THE FINAL, CORRECTED VERSION
+// frontend/context/AuthContext.tsx - THE FINAL & CORRECTED VERSION
 "use client"
 
 import { createContext, useContext, useState, useEffect, ReactNode } from "react"
@@ -12,7 +12,8 @@ interface User {
 
 interface AuthContextType {
   user: User | null
-  isLoading: boolean
+  isLoading: boolean // This is for login/logout actions
+  isAuthCheckComplete: boolean // THIS IS THE NEW STATE
   login: (userData: User) => void
   logout: () => void
 }
@@ -23,16 +24,15 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(false)
+  const [isAuthCheckComplete, setIsAuthCheckComplete] = useState(false); // Default to false
+
   const router = useRouter()
 
   useEffect(() => {
     const checkUserStatus = async () => {
       try {
-        // THIS IS THE FIX: Tell the browser to send the auth cookie.
-        const response = await fetch(`${API_URL}/api/auth/me`, {
-          credentials: 'include'
-        });
+        const response = await fetch(`${API_URL}/api/auth/me`, { credentials: 'include' });
         if (response.ok) {
           setUser(await response.json());
         } else {
@@ -41,7 +41,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } catch (error) {
         setUser(null);
       } finally {
-        setIsLoading(false);
+        // THIS IS THE FIX: When the check is done, set this to true.
+        setIsAuthCheckComplete(true);
       }
     }
     checkUserStatus();
@@ -52,20 +53,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const logout = async () => {
+    setIsLoading(true);
     try {
-      // THIS IS THE FIX: Tell the browser to send the auth cookie for logout.
-      await fetch(`${API_URL}/api/auth/logout`, {
-        method: "POST",
-        credentials: 'include'
-      });
+      await fetch(`${API_URL}/api/auth/logout`, { method: "POST", credentials: 'include' });
     } finally {
       setUser(null);
+      setIsLoading(false);
       router.push("/login");
     }
   }
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, logout }}>
+    <AuthContext.Provider value={{ user, isLoading, isAuthCheckComplete, login, logout }}>
       {children}
     </AuthContext.Provider>
   )
