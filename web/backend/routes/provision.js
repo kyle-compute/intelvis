@@ -7,20 +7,26 @@ const PROVISIONING_API_KEY = process.env.PROVISIONING_API_KEY;
 
 // Middleware to protect the provisioning endpoint
 const protectProvisioning = (req, res, next) => {
-  if (req.get('X-API-Key') === PROVISIONING_API_KEY) {
-    next();
-  } else {
-    res.status(401).json({ message: 'Unauthorized' });
+  const apiKey = req.get('X-API-Key');
+  if (apiKey && apiKey === PROVISIONING_API_KEY) {
+    return next();
   }
+  // Log failed attempt for security monitoring
+  console.warn(`[AUTH] Failed provision attempt from IP ${req.ip} with key: ${apiKey || 'none'}`);
+  res.status(401).json({ message: 'Unauthorized' });
 };
 
-// This endpoint is idempotent and handles case-insensitivity.
-router.post('/', protectProvisioning, async (req, res) => {
+// POST /api/provision
+// Idempotent and case-insensitive provisioning endpoint.
+router.post('/', protectProvisioning, async (req, res, next) => {
   const { mac: rawMac } = req.body;
-  if (!rawMac) {
-    return res.status(400).json({ message: 'MAC address is required' });
+
+  if (!rawMac || typeof rawMac !== 'string' || rawMac.trim() === '') {
+    // Return a clear error for bad requests.
+    return res.status(400).json({ message: 'Field "mac" is required and must be a non-empty string.' });
   }
-  const mac = rawMac.toLowerCase();
+
+  const mac = rawMac.toLowerCase().trim();
 
   try {
     const existingNic = await prisma.networkInterfaceCard.findUnique({
@@ -28,27 +34,29 @@ router.post('/', protectProvisioning, async (req, res) => {
     });
 
     if (existingNic) {
-      console.log(`Device with MAC ${mac} already exists.`);
-      return res.status(200).json({ message: 'Device already provisioned' });
+      console.log(`[PROVISION] Device with MAC ${mac} already exists. Responding 200 OK.`);
+      return res.status(200).json({ message: 'Device already provisioned', deviceId: existingNic.deviceId });
     }
 
-    // If it does not exist, create it.
-    await prisma.device.create({
+    console.log(`[PROVISION] New device. Creating entry for MAC ${mac}.`);
+    const newDevice = await prisma.device.create({
       data: {
         status: 'INACTIVE',
-        parentId: null, // Critical for the database trigger
+        parentId: null, // Satisfies database trigger
         nic: {
           create: { mac },
         },
       },
     });
     
-    console.log(`Successfully provisioned new device with MAC ${mac}.`);
-    res.status(201).json({ message: 'Device provisioned successfully' });
+    console.log(`[PROVISION] Successfully provisioned new device (ID: ${newDevice.id}) with MAC ${mac}.`);
+    res.status(201).json({ message: 'Device provisioned successfully', deviceId: newDevice.id });
 
   } catch (error) {
-    console.error('CRITICAL PROVISIONING ERROR:', error);
-    res.status(500).json({ message: 'Internal Server Error during provisioning' });
+    // The key change: Pass the error to the global error handler in index.js
+    // It will log the full stack trace and send the 500 response.
+    error.message = `Provisioning failed for MAC [${mac}]: ${error.message}`;
+    next(error);
   }
 });
 

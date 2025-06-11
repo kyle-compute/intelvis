@@ -11,17 +11,10 @@ const port = process.env.PORT || 3001;
 
 // --- Security Middleware (CORS) ---
 const corsOptions = {
-  origin: 'https://intelvis.ai', // Your exact frontend URL
+  origin: 'https://intelvis.ai',
   credentials: true,
 };
-
-// FIX: Explicitly handle pre-flight OPTIONS requests.
-// The browser sends an OPTIONS request first for any non-simple request.
-// This new route handler will catch it, apply CORS, and respond with 204 No Content.
-// This MUST come before the general app.use(cors(corsOptions)).
-app.options('*', cors(corsOptions));
-
-// Now, apply CORS for all other requests (GET, POST, etc.)
+app.options('*', cors(corsOptions)); // Pre-flight
 app.use(cors(corsOptions));
 
 // --- Core Middleware ---
@@ -29,7 +22,6 @@ app.use(express.json());
 app.use(cookieParser());
 
 // --- API Routes ---
-// These are correct. The full path is handled here.
 app.use('/api/auth', authRoutes);
 app.use('/api/devices', deviceRoutes);
 app.use('/api/provision', provisionRoutes);
@@ -39,6 +31,26 @@ app.get('/api/health', (req, res) => {
   res.status(200).json({ status: 'ok' });
 });
 
-app.listen(port, () => {
-  console.log(`Server is running on http://localhost:${port}`);
+// --- GLOBAL ERROR HANDLING MIDDLEWARE ---
+// This is the most important addition. It must be the *last* app.use() call.
+// It catches any error passed via `next(error)` from any route handler.
+app.use((err, req, res, next) => {
+  // Log the full error stack trace for maximum debuggability
+  console.error('--- UNHANDLED API ERROR ---');
+  console.error(`Error processing ${req.method} ${req.originalUrl}`);
+  console.error(err.stack); // This prints the full trace
+  console.error('--- END OF ERROR ---');
+
+  // Avoid sending a response if one has already been sent
+  if (res.headersSent) {
+    return next(err);
+  }
+
+  // Send a generic 500 response to the client
+  res.status(500).json({ message: 'Internal Server Error' });
+});
+
+
+app.listen(port, '0.0.0.0', () => {
+  console.log(`Backend server is running on http://0.0.0.0:${port}`);
 });
