@@ -1,8 +1,11 @@
-intelvis.ai {
-    handle_path /api/* {
-        reverse_proxy backend:3001
-    }
-    handle {
-        reverse_proxy frontend:3000
-    }
+# Caddyfile - Now uses environment variables
+
+# {$DOMAIN_NAME} will be automatically replaced with "intelvis.ai"
+{$DOMAIN_NAME} {
+    reverse_proxy frontend:3000
+}
+
+# This will become "api.intelvis.ai"
+api.{$DOMAIN_NAME} {
+    reverse_proxy backend:3001
 }

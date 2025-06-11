@@ -1,40 +1,45 @@
+# docker-compose.prod.yml - Aligned with the new .env format
+
 version: '3.8'
 
 services:
   caddy:
     image: caddy:latest
     restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
+    ports: ["80:80", "443:443"]
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile
       - caddy_data:/data
       - caddy_config:/config
-    depends_on:
-      - frontend
-      - backend
+    depends_on: [frontend, backend]
+    # Pass the domain name into the Caddy container
+    environment:
+      - DOMAIN_NAME=${DOMAIN_NAME}
 
   frontend:
     build: ./frontend
     restart: unless-stopped
+    expose: [3000]
     environment:
       - NODE_ENV=production
 
   backend:
     build: ./backend
     restart: unless-stopped
+    expose: [3001]
     environment:
       - NODE_ENV=production
-      - DATABASE_URL=postgresql://user:password@db:5432/mydb
+      # FIX: This now directly uses DATABASE_URL from the .env file.
+      - DATABASE_URL=${DATABASE_URL}
       - PORT=3001
       - JWT_SECRET=${JWT_SECRET}
       - PROVISIONING_API_KEY=${PROVISIONING_API_KEY}
     depends_on:
-      - db
+      db:
+        condition: service_healthy
 
   db:
-    image: postgres:15-alpine
+    image: timescale/timescaledb:latest-pg16
     restart: unless-stopped
     environment:
       - POSTGRES_USER=user
@@ -42,6 +47,11 @@ services:
       - POSTGRES_DB=mydb
     volumes:
       - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d mydb"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
 volumes:
   caddy_data:
