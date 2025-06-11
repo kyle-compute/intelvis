@@ -38,7 +38,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } else {
           setUser(null);
         }
-      } catch (error) {
+      } catch {
         setUser(null);
       } finally {
         // THIS IS THE FIX: When the check is done, set this to true.

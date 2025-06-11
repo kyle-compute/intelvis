@@ -1,10 +1,10 @@
-// frontend/app/dashboard/page.tsx - THE FINAL & CORRECTED VERSION
+// frontend/app/dashboard/page.tsx - THE FINAL & COMPLETE VERSION
 "use client"
 
 import { useState, useEffect } from "react"
 import { useAuth } from "@/context/AuthContext"
 import { toast } from "sonner"
-import { Loader2 } from "lucide-react"
+import { Loader2 } from "lucide-react" // This is now used in the JSX
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -16,7 +16,7 @@ interface Device {
 }
 
 export default function DashboardPage() {
-  const { user, isLoading: authIsLoading, logout } = useAuth()
+  const { user, isAuthCheckComplete, logout } = useAuth()
   const [devices, setDevices] = useState<Device[]>([])
   const [macAddress, setMacAddress] = useState("")
   const [isPairing, setIsPairing] = useState(false)
@@ -24,32 +24,38 @@ export default function DashboardPage() {
 
   useEffect(() => {
     const fetchDevices = async () => {
-      if (authIsLoading || !user) {
-        if (!authIsLoading) setIsFetchingDevices(false);
+      // Wait for the initial auth check to be complete.
+      if (!isAuthCheckComplete) {
         return;
       }
+      // If the check is done and there's no user, redirect.
+      if (!user) {
+        // The context's effect will handle the redirect, but we can stop fetching.
+        setIsFetchingDevices(false);
+        return;
+      }
+
       setIsFetchingDevices(true);
       try {
-        // THIS IS THE FIX: Tell the browser to send the auth cookie.
-        const response = await fetch(`${API_URL}/api/devices`, {
-          credentials: 'include'
-        });
+        const response = await fetch(`${API_URL}/api/devices`, { credentials: 'include' });
         if (response.ok) {
           setDevices(await response.json());
         } else if (response.status === 401) {
-          toast.error("Session expired. Please log in.");
+          toast.error("Session expired. Please log in again.");
           logout();
         } else {
           toast.error("Failed to fetch devices.");
         }
-      } catch {
+      } catch (error) {
+        console.error("An error occurred while fetching devices:", error);
         toast.error("An error occurred while fetching devices.");
       } finally {
         setIsFetchingDevices(false);
       }
     };
+
     fetchDevices();
-  }, [user, authIsLoading, logout]);
+  }, [user, isAuthCheckComplete, logout]);
 
   const handlePairDevice = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,41 +65,46 @@ export default function DashboardPage() {
     }
     setIsPairing(true);
     try {
-      // THIS IS THE FIX: Tell the browser to send the auth cookie.
       const response = await fetch(`${API_URL}/api/devices`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mac: macAddress }),
         credentials: 'include'
       });
       const newDevice = await response.json();
       if (response.ok) {
         toast.success("Device paired successfully!");
-        setDevices(prevDevices => [...prevDevices, newDevice]);
-        setMacAddress("");
+        setDevices(prev => [...prev, newDevice]);
+        setMacAddress('');
       } else if (response.status === 401) {
-        toast.error("Session expired. Please log in.");
+        toast.error("Your session has expired. Please log in again.");
         logout();
       } else {
-        toast.error(newDevice.message || "Failed to pair device.");
+        toast.error(newDevice.message || 'Failed to pair device.');
       }
-    } catch {
+    } catch (error) {
+      console.error("An error occurred during pairing:", error);
       toast.error("An error occurred during pairing.");
     } finally {
       setIsPairing(false);
     }
   };
 
-  if (authIsLoading) {
-    return <div className="p-8 text-center">Authenticating...</div>;
-  }
-  if (!user) {
-    // This will briefly show before the context redirects
-    return <div className="p-8 text-center">Redirecting to login...</div>;
+  if (!isAuthCheckComplete) {
+    return <div className="p-8 text-center text-gray-500">Initializing...</div>;
   }
 
+  if (!user) {
+    // This briefly shows while the AuthContext handles the redirect.
+    return <div className="p-8 text-center text-gray-500">Redirecting to login...</div>;
+  }
+
+  // This is the full JSX that was missing before.
   return (
     <div className="p-4 sm:p-8 max-w-4xl mx-auto">
+      <h1 className="text-3xl font-bold mb-2">Welcome, {user.email}</h1>
+      <p className="text-gray-400 mb-8">Your device dashboard.</p>
+
       <div className="grid md:grid-cols-3 gap-8">
         <div className="md:col-span-1">
           <div className="bg-gray-900 p-6 rounded-lg shadow-lg">
@@ -124,7 +135,10 @@ export default function DashboardPage() {
         <div className="md:col-span-2">
           <h2 className="text-xl font-semibold mb-4">Your Devices</h2>
           {isFetchingDevices ? (
-            <p className="text-gray-500">Loading devices...</p>
+            <div className="text-center text-gray-500">
+              <Loader2 className="h-6 w-6 animate-spin inline-block" />
+              <p>Loading devices...</p>
+            </div>
           ) : devices.length > 0 ? (
             <div className="space-y-4">
               {devices.map(device => (
