@@ -1,4 +1,4 @@
-// backend/routes/provision.js - FINAL HARDENED VERSION
+// backend/routes/provision.js - FINAL, TRIGGER-AWARE VERSION
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 
@@ -16,8 +16,6 @@ const protectProvisioning = (req, res, next) => {
 };
 
 router.post('/', protectProvisioning, async (req, res) => {
-  // THE FIX: NORMALIZE THE MAC ADDRESS
-  // Get the raw MAC from the ESP32 and force it to lowercase.
   const { mac: rawMac } = req.body;
   if (!rawMac) {
     return res.status(400).json({ message: 'MAC address is required' });
@@ -26,21 +24,20 @@ router.post('/', protectProvisioning, async (req, res) => {
 
   try {
     const existingNic = await prisma.networkInterfaceCard.findUnique({
-      where: { mac }, // Use the normalized MAC for the lookup
+      where: { mac },
       include: { device: true },
     });
 
     if (existingNic) {
-      console.log(`Device with MAC ${mac} already provisioned. Returning 200 OK.`);
       return res.status(200).json(existingNic.device);
     }
 
-    console.log(`New device with MAC ${mac}. Provisioning...`);
     const newDevice = await prisma.device.create({
       data: {
         status: 'INACTIVE',
+        parentId: null, // <-- THE FIX IS HERE. This satisfies the DB trigger.
         nic: {
-          create: { mac }, // Use the normalized MAC for creation
+          create: { mac },
         },
       },
     });

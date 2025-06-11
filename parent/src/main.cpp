@@ -5,9 +5,7 @@
 const char* ssid = "Homewifi_2.4G";
 const char* password = "9sophie2011";
 
-// Your server details
-// THIS IS CORRECT. It points to the main domain.
-// THIS IS CORRECT. It points to the main domain.
+
 const char* serverName = "https://intelvis.ai/api/provision";
 const char* apiKey = "another-very-strong-secret-key";
 
