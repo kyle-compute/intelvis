@@ -17,6 +17,7 @@ services:
   frontend:
     build:
       context: ./frontend
+      # Docker Compose automatically makes variables from .env available for build args
       args:
         - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
     restart: unless-stopped
@@ -26,7 +27,15 @@ services:
     build: ./backend
     restart: unless-stopped
     expose: [3001]
-    env_file: ./.env # The backend needs the full DATABASE_URL and JWT_SECRET
+    # --- THIS IS THE FIX ---
+    # We remove `env_file` and use the `environment` block instead.
+    # This ensures Docker Compose correctly substitutes the variables from your .env file
+    # before passing them to the container.
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - JWT_SECRET=${JWT_SECRET}
+      - PROVISIONING_API_KEY=${PROVISIONING_API_KEY}
+      - NODE_ENV=${NODE_ENV}
     depends_on:
       db:
         condition: service_healthy
@@ -34,15 +43,14 @@ services:
   db:
     image: timescale/timescaledb:latest-pg16
     restart: unless-stopped
-    # THIS IS THE FIX: Directly inject the required variables
+    # This part is correct. It properly reads from your .env file.
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
     volumes:
       - db_data:/var/lib/postgresql/data
     healthcheck:
-      # This test now uses the correct variable for the user.
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
