@@ -1,10 +1,11 @@
-// frontend/app/dashboard/page.tsx - THE FINAL & COMPLETE VERSION
+// frontend/app/dashboard/page.tsx - THE FINAL, COMPLETE, AND CORRECTED VERSION
 "use client"
 
 import { useState, useEffect } from "react"
 import { useAuth } from "@/context/AuthContext"
 import { toast } from "sonner"
-import { Loader2 } from "lucide-react" // This is now used in the JSX
+import { Loader2 } from "lucide-react"
+import { useRouter } from "next/navigation" // Import useRouter for the redirect
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -17,48 +18,72 @@ interface Device {
 
 export default function DashboardPage() {
   const { user, isAuthCheckComplete, logout } = useAuth()
+  const router = useRouter() // Get the router instance
   const [devices, setDevices] = useState<Device[]>([])
   const [macAddress, setMacAddress] = useState("")
   const [isPairing, setIsPairing] = useState(false)
   const [isFetchingDevices, setIsFetchingDevices] = useState(true)
 
+  // This effect handles fetching devices ONLY when the user is confirmed.
   useEffect(() => {
     const fetchDevices = async () => {
-      // Wait for the initial auth check to be complete.
-      if (!isAuthCheckComplete) {
-        return;
-      }
-      // If the check is done and there's no user, redirect.
-      if (!user) {
-        // The context's effect will handle the redirect, but we can stop fetching.
-        setIsFetchingDevices(false);
-        return;
-      }
-
-      setIsFetchingDevices(true);
-      try {
-        const response = await fetch(`${API_URL}/api/devices`, { credentials: 'include' });
-        if (response.ok) {
-          setDevices(await response.json());
-        } else if (response.status === 401) {
-          toast.error("Session expired. Please log in again.");
-          logout();
-        } else {
-          toast.error("Failed to fetch devices.");
+      // Only proceed if the auth check is done AND we have a user.
+      if (isAuthCheckComplete && user) {
+        setIsFetchingDevices(true);
+        try {
+          const response = await fetch(`${API_URL}/api/devices`, { credentials: 'include' });
+          if (response.ok) {
+            setDevices(await response.json());
+          } else {
+            // If this fails, the token is likely invalid. Logout.
+            toast.error("Session expired. Please log in again.");
+            logout(); // The logout function in AuthContext should handle the redirect.
+          }
+        } catch (error) {
+          console.error("Error fetching devices:", error);
+          toast.error("An error occurred while fetching devices.");
+        } finally {
+          setIsFetchingDevices(false);
         }
-      } catch (error) {
-        console.error("An error occurred while fetching devices:", error);
-        toast.error("An error occurred while fetching devices.");
-      } finally {
-        setIsFetchingDevices(false);
       }
     };
 
     fetchDevices();
-  }, [user, isAuthCheckComplete, logout]);
+  }, [user, isAuthCheckComplete, logout]); // Dependency array is correct.
 
+  // This effect handles REDIRECTION when auth state is confirmed.
+  useEffect(() => {
+    // If the check is complete and there's still no user, redirect to login.
+    if (isAuthCheckComplete && !user) {
+      router.push('/login');
+    }
+  }, [user, isAuthCheckComplete, router]);
+
+  // --- THIS IS THE CRITICAL RENDERING LOGIC FIX ---
+
+  // 1. While the auth check is running, show a full-page loader.
+  if (!isAuthCheckComplete) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
+  // 2. If the check is done and there's NO user, render the redirect message or null.
+  // The useEffect above will handle the actual redirect.
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <p>Redirecting to login...</p>
+      </div>
+    );
+  }
+
+  // 3. If the check is done AND there IS a user, render the dashboard.
   const handlePairDevice = async (e: React.FormEvent) => {
     e.preventDefault();
+    // ... (rest of the handlePairDevice function remains the same)
     if (!macAddress) {
       toast.error("MAC Address cannot be empty.");
       return;
@@ -90,16 +115,6 @@ export default function DashboardPage() {
     }
   };
 
-  if (!isAuthCheckComplete) {
-    return <div className="p-8 text-center text-gray-500">Initializing...</div>;
-  }
-
-  if (!user) {
-    // This briefly shows while the AuthContext handles the redirect.
-    return <div className="p-8 text-center text-gray-500">Redirecting to login...</div>;
-  }
-
-  // This is the full JSX that was missing before.
   return (
     <div className="p-4 sm:p-8 max-w-4xl mx-auto">
       <h1 className="text-3xl font-bold mb-2">Welcome, {user.email}</h1>
