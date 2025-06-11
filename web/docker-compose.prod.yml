@@ -1,5 +1,4 @@
 # docker-compose.prod.yml - FINAL & CORRECTED VERSION
-
 version: '3.8'
 
 services:
@@ -14,25 +13,20 @@ services:
     depends_on:
       - frontend
       - backend
-    env_file: ./.env
 
   frontend:
     build:
       context: ./frontend
-      # This correctly passes the API URL at BUILD TIME from the .env file.
       args:
         - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
     restart: unless-stopped
     expose: [3000]
-    # NOTE: No `env_file` here. This service needs no runtime secrets,
-    # which fixes the 502 Bad Gateway crash.
 
   backend:
     build: ./backend
     restart: unless-stopped
     expose: [3001]
-    # This correctly injects secrets at RUNTIME.
-    env_file: ./.env
+    env_file: ./.env # The backend needs the full DATABASE_URL and JWT_SECRET
     depends_on:
       db:
         condition: service_healthy
@@ -40,12 +34,16 @@ services:
   db:
     image: timescale/timescaledb:latest-pg16
     restart: unless-stopped
-    # This correctly injects user/pass credentials at RUNTIME.
-    env_file: ./.env
+    # THIS IS THE FIX: Directly inject the required variables
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - db_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U user -d mydb"]
+      # This test now uses the correct variable for the user.
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 5
