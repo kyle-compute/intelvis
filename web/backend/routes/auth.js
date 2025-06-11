@@ -1,4 +1,4 @@
-// backend/routes/auth.js - THE FINAL, SECURE & CORRECTED VERSION
+// backend/routes/auth.js - THE FINAL, ABSOLUTE, CORRECTED VERSION
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
@@ -13,12 +13,13 @@ const COOKIE_NAME = 'authToken';
 const setTokenCookie = (res, token) => {
   res.cookie(COOKIE_NAME, token, {
     httpOnly: true,
-    // THIS IS THE FIX: The cookie MUST be secure to use SameSite=None.
     secure: true,
-    // This allows the browser to send the cookie from intelvis.ai to api.intelvis.ai
     sameSite: 'none',
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    // THIS IS THE FINAL FIX: Explicitly set the parent domain.
+    // The leading dot makes the cookie valid for 'intelvis.ai' AND 'api.intelvis.ai'.
+    domain: '.intelvis.ai',
     path: '/',
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
   });
 };
 
@@ -55,12 +56,13 @@ router.get('/me', protect, (req, res) => {
 });
 
 router.post('/logout', (req, res) => {
-  // The logout cookie must also have the same secure settings to be cleared correctly.
+  // The logout cookie must have the exact same domain and path to be cleared correctly.
   res.cookie(COOKIE_NAME, '', {
     httpOnly: true,
     expires: new Date(0),
-    secure: true, // THIS IS THE FIX
-    sameSite: 'none', // THIS IS THE FIX
+    secure: true,
+    sameSite: 'none',
+    domain: '.intelvis.ai', // THIS IS THE FIX
     path: '/',
   });
   res.status(200).json({ message: 'Logged out successfully' });
