@@ -10,18 +10,19 @@ const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET;
 const COOKIE_NAME = 'authToken';
 
-const setTokenCookie = (res, token) => {
-  res.cookie(COOKIE_NAME, token, {
+// backend/routes/auth.js
+
+router.post('/logout', (req, res) => {
+  res.cookie(COOKIE_NAME, '', {
     httpOnly: true,
+    expires: new Date(0),
     secure: true,
     sameSite: 'none',
-    // THIS IS THE FINAL FIX: Explicitly set the parent domain.
-    // The leading dot makes the cookie valid for 'intelvis.ai' AND 'api.intelvis.ai'.
-    domain: '.intelvis.ai',
+    domain: '.intelvis.ai', // THIS IS ALSO THE FIX
     path: '/',
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
   });
-};
+  res.status(200).json({ message: 'Logged out successfully' });
+});
 
 router.post('/register', async (req, res) => {
   const { email, password } = req.body;
