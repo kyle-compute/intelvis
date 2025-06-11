@@ -1,10 +1,16 @@
-# Caddyfile - THE FINAL, SIMPLIFIED VERSION
+# Caddyfile - For development with Let's Encrypt Staging
 
+{
+    # This is a global options block
+    acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
+}
+
+# Block for the main frontend application
 intelvis.ai {
     reverse_proxy frontend:3000
 }
 
+# Block for the API backend
 api.intelvis.ai {
-    # Simple, clean proxy pass. The backend handles the full /api path.
     reverse_proxy backend:3001
 }
