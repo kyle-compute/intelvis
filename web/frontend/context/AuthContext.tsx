@@ -1,4 +1,4 @@
-// frontend/context/AuthContext.tsx
+// frontend/context/AuthContext.tsx - THE FINAL, CORRECTED VERSION
 "use client"
 
 import {
@@ -8,14 +8,16 @@ import {
   useState,
   ReactNode,
 } from "react"
-import { useRouter } from "next/navigation"
+
+// Note: No longer need useRouter here as we use window for redirects
+// to break the race condition.
 
 interface User {
   id: string
   email: string
 }
 
-interface AuthContextShape {
+interface AuthContextType {
   user: User | null
   isLoading: boolean
   isAuthCheckComplete: boolean
@@ -23,79 +25,90 @@ interface AuthContextShape {
   logout: () => Promise<void>
 }
 
-const AuthContext = createContext<AuthContextShape | null>(null)
+const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "https://api.intelvis.ai" // e.g. https://api.intelvis.ai
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [isAuthCheckComplete, setIsAuthCheckComplete] = useState(false)
-  const router = useRouter()
 
-  // 1. Initial session check ------------------------------------------------------------------
   useEffect(() => {
-    ;(async () => {
+    const checkSession = async () => {
       try {
-        const res = await fetch(`${API_BASE}/api/auth/me`, {
+        const res = await fetch(`${API_URL}/api/auth/me`, {
           credentials: "include",
         })
-        if (res.ok) setUser(await res.json())
-        else setUser(null)
+        if (res.ok) {
+          setUser(await res.json())
+        } else {
+          setUser(null)
+        }
       } catch {
         setUser(null)
       } finally {
         setIsAuthCheckComplete(true)
       }
-    })()
+    }
+    checkSession()
   }, [])
 
-  // 2. Login ----------------------------------------------------------------------------------
   const login = async (email: string, password: string) => {
-    setIsLoading(true)
+    setIsLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/auth/login`, {
+      const res = await fetch(`${API_URL}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include", // critical – stores authToken cookie
         body: JSON.stringify({ email, password }),
-      })
-      if (!res.ok) throw new Error("invalid-credentials")
-      const data = (await res.json()) as User
-      setUser(data)
-      router.replace("/dashboard")
-    } finally {
-      setIsLoading(false)
-    }
-  }
+      });
 
-  // 3. Logout ---------------------------------------------------------------------------------
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || "Invalid credentials");
+      }
+      
+      // On success, we don't even need to parse the user data.
+      // We force a hard reload to the dashboard. The AuthContext's
+      // initial useEffect will then run on a fresh page and fetch the user.
+      // This completely breaks the race condition.
+      window.location.replace("/dashboard");
+
+    } finally {
+      // In the success case, the page reloads so this is never hit.
+      // It will only be hit on failure.
+      setIsLoading(false);
+    }
+  };
+
   const logout = async () => {
-    setIsLoading(true)
+    setIsLoading(true);
     try {
-      await fetch(`${API_BASE}/api/auth/logout`, {
+      await fetch(`${API_URL}/api/auth/logout`, {
         method: "POST",
         credentials: "include",
-      })
+      });
     } finally {
-      setUser(null)
-      setIsLoading(false)
-      router.replace("/login")
+      setUser(null);
+      setIsLoading(false);
+      // A hard redirect is also more robust for logout.
+      window.location.replace("/login");
     }
-  }
+  };
 
   return (
     <AuthContext.Provider
       value={{ user, isLoading, isAuthCheckComplete, login, logout }}
     >
-      {children}
+      {isAuthCheckComplete ? children : null /* Or a loading spinner */}
     </AuthContext.Provider>
   )
 }
 
-// 4. Consumer hook ----------------------------------------------------------------------------
 export const useAuth = () => {
-  const ctx = useContext(AuthContext)
-  if (!ctx) throw new Error("useAuth must be used inside <AuthProvider>")
-  return ctx
+  const context = useContext(AuthContext)
+  if (context === undefined) {
+    throw new Error("useAuth must be used within an AuthProvider")
+  }
+  return context
 }
