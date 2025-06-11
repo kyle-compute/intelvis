@@ -15,22 +15,14 @@ const COOKIE_NAME = 'authToken';
 /* ------------------------------------------------------------------ */
 
 function buildCookieOptions(maxAgeMs = 7 * 24 * 60 * 60 * 1000) {
-  const isProd = process.env.NODE_ENV === 'production';
-
-  const opts = {
-    httpOnly : true,
-    secure   : isProd,                 // Secure only in prod (HTTPS)
-    sameSite : isProd ? 'none' : 'lax',
-    path     : '/',
-    maxAge   : maxAgeMs,
+  return {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax', // 'lax' is the modern, secure default for same-site apps.
+    path: '/',
+    maxAge: maxAgeMs,
   };
 
-  // Attach domain only when explicitly supplied (fixes localhost logout)
-  if (isProd && process.env.COOKIE_DOMAIN) {
-    opts.domain = process.env.COOKIE_DOMAIN; // e.g. ".intelvis.ai"
-  }
-
-  return opts;
 }
 
 function setTokenCookie(res, token) {
