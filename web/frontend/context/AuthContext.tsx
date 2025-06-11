@@ -25,7 +25,7 @@ interface AuthContextShape {
 
 const AuthContext = createContext<AuthContextShape | null>(null)
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "" // e.g. https://api.intelvis.ai
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "https://api.intelvis.ai" // e.g. https://api.intelvis.ai
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null)
