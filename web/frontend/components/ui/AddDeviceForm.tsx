@@ -18,12 +18,22 @@ const formSchema = z.object({
   }),
 })
 
-// --- STEP 1: Define the props the component accepts ---
-interface AddDeviceFormProps {
-  onDeviceAdded: (device: any) => void; // It expects a function
+// --- FIX #1: Define a specific type for the device data ---
+// This resolves the "Unexpected any" error.
+interface NewDevice {
+  id: string;
+  alias: string | null;
+  status: string;
+  nic: {
+    mac: string;
+  };
+  createdAt: string;
 }
 
-// --- STEP 2: Accept the props ---
+interface AddDeviceFormProps {
+  onDeviceAdded: (device: NewDevice) => void;
+}
+
 export function AddDeviceForm({ onDeviceAdded }: AddDeviceFormProps) {
   const [isLoading, setIsLoading] = useState(false)
 
@@ -48,14 +58,11 @@ export function AddDeviceForm({ onDeviceAdded }: AddDeviceFormProps) {
       if (response.ok) {
         toast.success("Device paired successfully!")
         form.reset()
-        
-        // --- STEP 3: Call the parent's function with the new device data ---
         onDeviceAdded(data);
-
       } else {
         toast.error(data.message || "Pairing failed.")
       }
-    } catch (error) {
+    } catch { // --- FIX #2: Removed the unused 'error' variable ---
       toast.error("A network or server error occurred.")
     } finally {
       setIsLoading(false)
