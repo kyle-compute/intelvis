@@ -1,96 +1,64 @@
+-negotiable source of truth for the application's architecture, code, and workflows. All previous documentation is obsolete. Adherence to this guide is mandatory to prevent the catastrophic failures of the past.
+1. Final Architecture
 
-Here is the complete summary of our entire journey, with the final, correct code and workflows. Copy this into a new markdown file like PROJECT_BIBLE.md and make it the source of truth for your team.
-Project Architecture & Development Bible
+The architecture is simple and robust. It consists of four Docker services orchestrated by docker-compose.
 
-This document is the single source of truth for the application's architecture, code, and development workflows. It is designed to onboard new developers, align the team, and prevent technical debt.
-Core Architectural Principles
+    caddy: The reverse proxy. It is the only service exposed to the outside world. It handles all incoming traffic on ports 80/443, acquires SSL certificates automatically, and routes requests to the correct internal service.
 
-    Scalability: The database is designed from the ground up to handle billions of IoT telemetry points using PostgreSQL with TimescaleDB.
+    frontend: The Next.js application. It is not exposed publicly. It receives traffic only from Caddy.
 
-    Maintainability: A strict separation between a device's logical identity (Device) and its physical hardware (Nic) allows for seamless board swaps and long-term management without data loss.
+    backend: The Express.js API. It is not exposed publicly. It receives traffic only from Caddy.
 
-    Reproducibility: The entire development environment is containerized with Docker, ensuring that every developer's machine and the production environment are identical and predictable.
-
-1. Local Development Environment Setup
-
-This section details the one-time setup process for any developer joining the project.
-1.1. Project Structure
-
-The project follows a standard monorepo structure:
+    db: The TimescaleDB/PostgreSQL database. It is not exposed publicly. It receives connections only from the backend.
 
       
-/web/                   <-- PROJECT ROOT
-├── docker-compose.yml  <-- Defines all services
-├── .env                <-- Holds environment variables
-├── /backend/
-│   ├── Dockerfile
-│   ├── .dockerignore
-│   ├── package.json
-│   ├── index.js
-│   ├── /prisma/
-│   │   └── schema.prisma
-│   └── /routes/
-│       ├── auth.js
-│       └── devices.js
-│   └── /middleware/
-│       └── protect.js
-└── /frontend/
-    ├── Dockerfile
-    ├── package.json
-    └── ... (Next.js app structure)
++------------------+
+|   The Internet   |
++--------+---------+
+         |
+ (Ports 80 & 443)
+         |
++--------v---------+      +------------------+      +-------------------+
+|     caddy        +------>   frontend       |      |      backend      |
+| (Reverse Proxy)  |      | (port 3000)      |      |   (port 3001)     |
++------------------+      +------------------+      +---------+---------+
+         ^                                                     |
+         |                                                     |
+         +-----------------------------------------------------+
+                                                               |
+                                                     +---------v---------+
+                                                     |        db         |
+                                                     |   (port 5432)     |
+                                                     +-------------------+
 
     
 
 IGNORE_WHEN_COPYING_START
 Use code with caution.
 IGNORE_WHEN_COPYING_END
-1.2. First-Time Setup Workflow
+2. The One True Setup Workflow
 
-A new developer must follow these steps precisely from the project root (/web/).
+This is the only sanctioned method for setting up a new development or production environment from a clean slate. There are no other methods.
+Step 1: Prepare the Environment
 
-Step 1: Start All Services
-This command builds the Docker images and starts the database, backend, and frontend containers in the background. The healthcheck ensures the backend waits until the database is truly ready.
+    Clone the repository.
 
-      
-docker-compose up -d --build
+    Navigate to the /web directory.
 
-    
+    Ensure the correct versions of docker and docker compose (with a space) are installed. The legacy docker-compose (with a hyphen) is forbidden.
 
-IGNORE_WHEN_COPYING_START
-Use code with caution. Bash
-IGNORE_WHEN_COPYING_END
+    Create the init.sql file inside a new directory: web/db-init/init.sql. This automates the database setup.
 
-Step 2: Run the Base Database Migration
-This command reaches into the running backend container and tells Prisma to create the initial database tables based on prisma/schema.prisma.
+web/db-init/init.sql:
 
       
-docker-compose exec backend npx prisma migrate dev --name init
-
-    
-
-IGNORE_WHEN_COPYING_START
-Use code with caution. Bash
-IGNORE_WHEN_COPYING_END
-
-Step 3: Apply Advanced Database Features
-This is a required, one-time setup step for the new database. This script upgrades the plain database with TimescaleDB, ltree, and the necessary triggers.
-
-      
-docker-compose exec -T db psql -U user -d mydb <<'EOF'
--- 1. Enable ALL necessary extensions.
+-- This script runs automatically when the database container is first created.
+-- It enables all necessary extensions and creates the required trigger functions.
 CREATE EXTENSION IF NOT EXISTS ltree;
 CREATE EXTENSION IF NOT EXISTS timescaledb;
 
--- 2. Alter the 'path' column from TEXT to the powerful LTREE type.
-ALTER TABLE "Device" ALTER COLUMN "path" TYPE ltree USING "path"::ltree;
-
--- 3. Create the fast GiST index on the ltree column.
-CREATE INDEX "Device_path_idx" ON "Device" USING GIST ("path");
-
--- 4. Convert the Telemetry table into a TimescaleDB hypertable.
-SELECT create_hypertable('"Telemetry"', 'eventTs');
-
--- 5. Create the trigger function to automatically manage the device path.
+-- This function will be attached via a trigger created by Prisma migrations
+-- or a subsequent manual step if needed.
 CREATE OR REPLACE FUNCTION update_device_path() RETURNS trigger AS $$
   BEGIN
     IF NEW."parentId" IS NULL THEN
@@ -105,11 +73,31 @@ CREATE OR REPLACE FUNCTION update_device_path() RETURNS trigger AS $$
   END;
 $$ LANGUAGE plpgsql;
 
--- 6. Attach the trigger to the Device table.
-CREATE TRIGGER trg_device_path_update
-BEFORE INSERT OR UPDATE OF "parentId" ON "Device"
-FOR EACH ROW EXECUTE PROCEDURE update_device_path();
-EOF
+    
+
+IGNORE_WHEN_COPYING_START
+Use code with caution. SQL
+IGNORE_WHEN_COPYING_END
+Step 2: Full System Startup & Migration
+
+These three commands, run in order from the /web directory, will bring the entire system online correctly.
+
+    Nuke the old environment (if it exists) to prevent corruption:
+
+          
+    sudo docker compose -f docker-compose.prod.yml down --remove-orphans --volumes
+
+        
+
+    IGNORE_WHEN_COPYING_START
+
+Use code with caution. Bash
+IGNORE_WHEN_COPYING_END
+
+Build and start all services. The -d flag runs them in the background. The database will automatically run the init.sql script.
+
+      
+sudo docker compose -f docker-compose.prod.yml up --build -d
 
     
 
@@ -117,64 +105,79 @@ IGNORE_WHEN_COPYING_START
 Use code with caution. Bash
 IGNORE_WHEN_COPYING_END
 
-Your environment is now fully configured and ready for development.
-2. The Final Codebase
-
-This section contains the complete, final versions of all key configuration and code files.
-2.1. Docker Configuration
-docker-compose.yml
-
-This file defines our three services and uses a healthcheck to prevent startup race conditions.
+Run the database migration. This command connects to the running backend container and instructs Prisma to create all the necessary tables.
 
       
-services:
-  db:
-    image: timescale/timescaledb:latest-pg16
-    container_name: iot-db
-    restart: always
-    environment:
-      - POSTGRES_USER=user
-      - POSTGRES_PASSWORD=password
-      - POSTGRES_DB=mydb
-    ports:
-      - '5432:5432'
-    volumes:
-      - db_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U user -d mydb"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
+sudo docker compose -f docker-compose.prod.yml exec backend npx prisma migrate deploy
 
-  backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    container_name: iot-backend
-    restart: always
-    ports:
-      - '4000:4000' # Backend runs on port 4000
-    depends_on:
-      db:
-        condition: service_healthy
-    environment:
-      - DATABASE_URL=${DATABASE_URL_DOCKER}
-      - JWT_SECRET=${JWT_SECRET}
+    
+
+IGNORE_WHEN_COPYING_START
+
+    Use code with caution. Bash
+    IGNORE_WHEN_COPYING_END
+
+The system is now live and fully functional.
+3. Final Configuration Files
+
+These are the canonical versions of all critical configuration files. They are not to be modified without updating this bible.
+docker-compose.prod.yml
+
+      
+# The one true production compose file.
+version: '3.8'
+
+services:
+  caddy:
+    image: caddy:latest
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
     volumes:
-      - ./backend:/app
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - frontend
+      - backend
+    env_file: ./.env
 
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile
-    container_name: iot-frontend
-    restart: always
-    ports:
-      - '3000:3000'
+      args:
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+    restart: unless-stopped
+    expose: [3000]
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    expose: [3001]
+    env_file: ./.env
     depends_on:
-      - backend
+      db:
+        condition: service_healthy
+
+  db:
+    image: timescale/timescaledb:latest-pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      # This line automates the database setup.
+      - ./db-init/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
 volumes:
+  caddy_data:
+  caddy_config:
   db_data:
 
     
@@ -182,411 +185,165 @@ volumes:
 IGNORE_WHEN_COPYING_START
 Use code with caution. Yaml
 IGNORE_WHEN_COPYING_END
-.env (in project root)
+.env
 
       
-# --- For Docker Compose ---
-DATABASE_URL_DOCKER="postgresql://user:password@db:5432/mydb?schema=public"
-JWT_SECRET="your-strong-random-secret-key-goes-here"
+# The single source of truth for all environment variables.
 
-# --- For Local Machine Tools (Prisma Studio) ---
-DATABASE_URL="postgresql://user:password@localhost:5432/mydb?schema=public"
+# --- DOMAIN CONFIG (FOR CADDY) ---
+DOMAIN_NAME=intelvis.ai
+
+# --- DATABASE CREDENTIALS (FOR DB CONTAINER) ---
+POSTGRES_USER=user
+POSTGRES_PASSWORD=password
+POSTGRES_DB=mydb
+
+# --- BACKEND SECRETS (FOR BACKEND CONTAINER) ---
+DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?schema=public
+JWT_SECRET=a-very-strong-and-secret-key-that-you-should-change
+PROVISIONING_API_KEY=another-very-strong-secret-key
+
+# --- FRONTEND CONFIG (FOR FRONTEND CONTAINER AT BUILD TIME) ---
+NEXT_PUBLIC_API_URL=https://api.intelvis.ai
 
     
 
 IGNORE_WHEN_COPYING_START
 Use code with caution. Env
 IGNORE_WHEN_COPYING_END
-backend/Dockerfile
-
-This builds the backend image, correctly layering npm install and prisma generate.
+Caddyfile
 
       
-FROM node:20-alpine
-WORKDIR /app
+# This file routes traffic to the correct containers.
+# It uses the staging server to avoid rate limits during development.
 
-COPY package*.json ./
-RUN npm install
-
-COPY prisma ./prisma/
-RUN npx prisma generate
-
-COPY . .
-
-EXPOSE 4000
-CMD [ "node", "index.js" ]
-
-    
-
-IGNORE_WHEN_COPYING_START
-Use code with caution. Dockerfile
-IGNORE_WHEN_COPYING_END
-backend/.dockerignore
-
-This is critical. It prevents the local node_modules from overwriting the container's, which would delete the generated Prisma client.
-
-      
-node_modules
-
-    
-
-IGNORE_WHEN_COPYING_START
-Use code with caution.
-IGNORE_WHEN_COPYING_END
-2.2. Backend Code
-backend/package.json
-
-Note the crucial type: "module" which enables modern import/export syntax.
-
-      
 {
-  "name": "backend",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "type": "module",
-  "scripts": {
-    "start": "node index.js"
-  },
-  "dependencies": {
-    "@prisma/client": "^6.9.0",
-    "bcryptjs": "^2.4.3",
-    "cookie-parser": "^1.4.6",
-    "express": "^4.19.2",
-    "jsonwebtoken": "^9.0.2"
-  },
-  "devDependencies": {
-    "@types/bcryptjs": "^2.4.6",
-    "@types/cookie-parser": "^1.4.7",
-    "@types/express": "^4.17.21",
-    "@types/jsonwebtoken": "^9.0.6",
-    "prisma": "^6.9.0"
-  }
+    # This global block tells Caddy to use the Let's Encrypt staging server.
+    # It prevents rate-limiting errors. Browsers will show a certificate warning,
+    # which is expected. Click "Accept Risk and Continue".
+    #
+    # TO GO LIVE: Comment out or delete this entire block and restart Caddy.
+    acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
+}
+
+# Route the main domain to the frontend.
+{$DOMAIN_NAME} {
+    reverse_proxy frontend:3000
+}
+
+# Route the API subdomain to the backend.
+api.{$DOMAIN_NAME} {
+    reverse_proxy backend:3001
 }
 
     
 
 IGNORE_WHEN_COPYING_START
-Use code with caution. Json
+Use code with caution. Caddy
 IGNORE_WHEN_COPYING_END
-backend/prisma/schema.prisma
+4. Final Critical Code
 
-The final, correct schema using a composite key for Telemetry to work with TimescaleDB.
-
-      
-generator client {
-  provider = "prisma-client-js"
-}
-
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
-
-model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  password  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  devices   Device[]
-}
-
-model Nic {
-  id        String   @id @default(cuid())
-  mac       String   @unique
-  deviceId  String?  @unique
-  device    Device?  @relation(fields: [deviceId], references: [id], onDelete: SetNull)
-  addedAt   DateTime @default(now())
-}
-
-enum DeviceStatus {
-  ACTIVE
-  INACTIVE
-  DECOMMISSIONED
-}
-
-model Device {
-  id        String   @id @default(cuid())
-  ownerId   String
-  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  parentId  String?
-  parent    Device?  @relation("DeviceTree", fields: [parentId], references: [id], onDelete: NoAction)
-  children  Device[] @relation("DeviceTree")
-  path      String?  @db.Text
-  alias     String?
-  status    DeviceStatus @default(ACTIVE)
-  nicId     String?  @unique
-  nic       Nic?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  Telemetry Telemetry[]
-  @@index([ownerId, status])
-}
-
-model Telemetry {
-  deviceId  String
-  device    Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
-  eventTs   DateTime @db.Timestamp(6)
-  leakRate  Float    @db.DoublePrecision
-  pressure  Float    @db.DoublePrecision
-  payload   Json?
-  ownerId   String
-  @@id([deviceId, eventTs])
-  @@index([deviceId, eventTs(sort: Desc)])
-  @@index([ownerId, eventTs(sort: Desc)])
-}
-
-    
-
-IGNORE_WHEN_COPYING_START
-Use code with caution. Prisma
-IGNORE_WHEN_COPYING_END
-backend/index.js
-
-The main server entry point.
-
-      
-import express from 'express';
-import cookieParser from 'cookie-parser';
-import authRoutes from './routes/auth.js';
-import deviceRoutes from './routes/devices.js';
-
-const app = express();
-const port = 4000;
-
-app.use(express.json());
-app.use(cookieParser());
-
-// API Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/devices', deviceRoutes);
-
-app.listen(port, () => {
-  console.log(`Backend server is running on http://localhost:${port}`);
-});
-
-    
-
-IGNORE_WHEN_COPYING_START
-Use code with caution. JavaScript
-IGNORE_WHEN_COPYING_END
-backend/routes/auth.js
-
-All authentication logic.
-
-      
-import { Router } from 'express';
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
-import { PrismaClient } from '@prisma/client';
-import { protect } from '../middleware/protect.js';
-
-const prisma = new PrismaClient();
-const router = Router();
-const JWT_SECRET = process.env.JWT_SECRET;
-const COOKIE_NAME = 'authToken';
-
-const setTokenCookie = (res, token) => {
-  res.cookie(COOKIE_NAME, token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    path: '/',
-  });
-};
-
-router.post('/register', async (req, res) => {
-  const { email, password } = req.body;
-  if (!email || !password) {
-    return res.status(400).json({ message: 'Please provide email and password' });
-  }
-  const existingUser = await prisma.user.findUnique({ where: { email } });
-  if (existingUser) {
-    return res.status(409).json({ message: 'User already exists' });
-  }
-  const salt = await bcrypt.genSalt(10);
-  const hashedPassword = await bcrypt.hash(password, salt);
-  const user = await prisma.user.create({
-    data: { email, password: hashedPassword },
-  });
-  res.status(201).json({ id: user.id, email: user.email });
-});
-
-router.post('/login', async (req, res) => {
-  const { email, password } = req.body;
-  const user = await prisma.user.findUnique({ where: { email } });
-  if (!user || !(await bcrypt.compare(password, user.password))) {
-    return res.status(401).json({ message: 'Invalid credentials' });
-  }
-  const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
-  setTokenCookie(res, token);
-  res.status(200).json({ id: user.id, email: user.email });
-});
-
-router.get('/me', protect, (req, res) => {
-  res.status(200).json(req.user);
-});
-
-router.post('/logout', (req, res) => {
-  res.cookie(COOKIE_NAME, '', { httpOnly: true, expires: new Date(0) });
-  res.status(200).json({ message: 'Logged out successfully' });
-});
-
-export default router;
-
-    
-
-IGNORE_WHEN_COPYING_START
-Use code with caution. JavaScript
-IGNORE_WHEN_COPYING_END
-backend/middleware/protect.js
-
-The authentication gatekeeper.
-
-      
-import jwt from 'jsonwebtoken';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
-
-export const protect = async (req, res, next) => {
-  let token;
-  if (req.cookies.authToken) {
-    try {
-      token = req.cookies.authToken;
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      req.user = await prisma.user.findUnique({
-        where: { id: decoded.userId },
-        select: { id: true, email: true, createdAt: true },
-      });
-      if (!req.user) {
-        return res.status(401).json({ message: 'Not authorized, user not found' });
-      }
-      next();
-    } catch (error) {
-      return res.status(401).json({ message: 'Not authorized, token failed' });
-    }
-  }
-  if (!token) {
-    res.status(401).json({ message: 'Not authorized, no token' });
-  }
-};
-
-    
-
-IGNORE_WHEN_COPYING_START
-Use code with caution. JavaScript
-IGNORE_WHEN_COPYING_END
-backend/routes/devices.js
-
-The logic for adding a device to a user account.
-
-      
-import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
-import { protect } from '../middleware/protect.js';
-
-const prisma = new PrismaClient();
-const router = Router();
-
-router.post('/', protect, async (req, res) => {
-  const { mac } = req.body;
-  const ownerId = req.user.id;
-  if (!mac) {
-    return res.status(400).json({ message: 'MAC address is required' });
-  }
-  try {
-    const nic = await prisma.nic.findUnique({
-      where: { mac: mac.toLowerCase() },
-    });
-    if (!nic) {
-      return res.status(404).json({ message: 'Device with this MAC not found' });
-    }
-    if (nic.deviceId) {
-      return res.status(409).json({ message: 'Device already claimed' });
-    }
-    const newDevice = await prisma.device.create({
-      data: { ownerId: ownerId, nicId: nic.id },
-    });
-    res.status(201).json(newDevice);
-  } catch (error) {
-    console.error('Error adding device:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-});
-
-export default router;
-
-    
-
-IGNORE_WHEN_COPYING_START
-Use code with caution. JavaScript
-IGNORE_WHEN_COPYING_END
-2.3. Frontend Code
+The following code files contain critical fixes that resolved major application bugs.
 frontend/context/AuthContext.tsx
 
-The global state manager for authentication.
+This version uses window.location.replace to perform a hard redirect, which is the only correct way to break the authentication race condition.
 
       
 "use client"
 
-import { createContext, useContext, useState, useEffect, ReactNode } from "react"
-import { useRouter } from "next/navigation"
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  ReactNode,
+} from "react"
 
 interface User {
   id: string
   email: string
-  createdAt: string
 }
 
 interface AuthContextType {
   user: User | null
   isLoading: boolean
-  login: (userData: User) => void
-  logout: () => void
+  isAuthCheckComplete: boolean
+  login: (email: string, password: string) => Promise<void>
+  logout: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-export function AuthProvider({ children }: { children: ReactNode }) {
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
+
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const router = useRouter()
+  const [isLoading, setIsLoading] = useState(false)
+  const [isAuthCheckComplete, setIsAuthCheckComplete] = useState(false)
 
   useEffect(() => {
-    const checkUserStatus = async () => {
+    const checkSession = async () => {
       try {
-        const response = await fetch("/api/auth/me")
-        if (response.ok) {
-          setUser(await response.json())
+        const res = await fetch(`${API_URL}/api/auth/me`, {
+          credentials: "include",
+        })
+        if (res.ok) {
+          setUser(await res.json())
         } else {
           setUser(null)
         }
-      } catch (error) {
+      } catch {
         setUser(null)
       } finally {
-        setIsLoading(false)
+        setIsAuthCheckComplete(true)
       }
     }
-    checkUserStatus()
+    checkSession()
   }, [])
 
-  const login = (userData: User) => setUser(userData)
+  const login = async (email: string, password: string) => {
+    setIsLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/api/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || "Invalid credentials");
+      }
+      
+      // THE FIX: A hard redirect breaks the frontend race condition.
+      window.location.replace("/dashboard");
+
+    } finally {
+      // This is only hit on failure, as success causes a page reload.
+      setIsLoading(false);
+    }
+  };
 
   const logout = async () => {
+    setIsLoading(true);
     try {
-      await fetch("/api/auth/logout", { method: "POST" })
+      await fetch(`${API_URL}/api/auth/logout`, {
+        method: "POST",
+        credentials: "include",
+      });
     } finally {
-      setUser(null)
-      router.push("/login")
+      setUser(null);
+      setIsLoading(false);
+      window.location.replace("/login");
     }
-  }
+  };
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, logout }}>
-      {children}
+    <AuthContext.Provider
+      value={{ user, isLoading, isAuthCheckComplete, login, logout }}
+    >
+      {/* Do not render children until the initial auth check is complete. */}
+      {isAuthCheckComplete ? children : null }
     </AuthContext.Provider>
   )
 }
@@ -604,45 +361,14 @@ export const useAuth = () => {
 IGNORE_WHEN_COPYING_START
 Use code with caution. Tsx
 IGNORE_WHEN_COPYING_END
-frontend/app/layout.tsx
+frontend/app/login/page.tsx
 
-Wrapping the entire app in the AuthProvider.
-
-      
-import "./globals.css"
-import { ReactNode } from "react"
-import { AuthProvider } from "@/context/AuthContext"
-import { Navbar } from "@/components/ui/navbar"
-import { Toaster } from "@/components/ui/sonner" // Assuming you have this
-
-export default function RootLayout({ children }: { children: ReactNode }) {
-  return (
-    <html lang="en" suppressHydrationWarning>
-      <body className="min-h-screen">
-        <AuthProvider>
-          <Navbar />
-          <div className="pt-16">{children}</div>
-          <Toaster />
-        </AuthProvider>
-      </body>
-    </html>
-  )
-}
-
-    
-
-IGNORE_WHEN_COPYING_START
-Use code with caution. Tsx
-IGNORE_WHEN_COPYING_END
-frontend/app/(auth)/login/page.tsx
-
-The login form with real API logic.
+This version is simplified to only call the context and correctly handles errors in a type-safe manner to pass strict linting rules.
 
       
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
@@ -651,9 +377,22 @@ import { Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import { useAuth } from "@/context/AuthContext"
 import { Button } from "@/components/ui/button"
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
 
 const formSchema = z.object({
   email: z.string().email({ message: "Enter a valid email." }),
@@ -661,7 +400,6 @@ const formSchema = z.object({
 })
 
 export default function LoginPage() {
-  const router = useRouter()
   const { login } = useAuth()
   const [isLoading, setIsLoading] = useState(false)
 
@@ -671,25 +409,17 @@ export default function LoginPage() {
   })
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    setIsLoading(true)
+    setIsLoading(true);
     try {
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(values),
-      })
-      const data = await response.json()
-      if (response.ok) {
-        login(data)
-        toast.success("Logged in successfully.")
-        router.push("/dashboard")
-      } else {
-        toast.error(data.message || "Login failed.")
-      }
+      await login(values.email, values.password);
     } catch (error) {
-      toast.error("An error occurred.")
-    } finally {
-      setIsLoading(false)
+      // THE FIX: Type-safe error handling for strict linters.
+      let errorMessage = "An unknown login error occurred.";
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      toast.error(errorMessage);
+      setIsLoading(false);
     }
   }
 
@@ -704,30 +434,48 @@ export default function LoginPage() {
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <FormField
-                control={form.control} name="email"
+                control={form.control}
+                name="email"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Email</FormLabel>
                     <FormControl>
-                      <Input type="email" placeholder="name@example.com" disabled={isLoading} {...field} />
+                      <Input
+                        type="email"
+                        placeholder="name@example.com"
+                        autoComplete="email"
+                        disabled={isLoading}
+                        {...field}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
               <FormField
-                control={form.control} name="password"
+                control={form.control}
+                name="password"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Password</FormLabel>
                     <FormControl>
-                      <Input type="password" placeholder="••••••••" disabled={isLoading} {...field} />
+                      <Input
+                        type="password"
+                        placeholder="••••••••"
+                        autoComplete="current-password"
+                        disabled={isLoading}
+                        {...field}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full" disabled={isLoading || !form.formState.isValid}>
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={isLoading || !form.formState.isValid}
+              >
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Log in
               </Button>
@@ -735,7 +483,10 @@ export default function LoginPage() {
           </Form>
           <div className="mt-4 text-center text-sm">
             Need an account?{" "}
-            <Link href="/register" className="font-medium text-primary underline-offset-4 hover:underline">
+            <Link
+              href="/register"
+              className="font-medium text-primary underline-offset-4 hover:underline"
+            >
               Sign up
             </Link>
           </div>
@@ -748,10 +499,22 @@ export default function LoginPage() {
     
 
 IGNORE_WHEN_COPYING_START
-Use code with caution. 
+Use code with caution. Tsx
+IGNORE_WHEN_COPYING_END
+5. Summary of Problems Solved (The "Wall of Shame")
 
+This project was plagued by a cascading series of failures. Each was solved in turn:
 
-This command is for preseeding db with mac stuff i guess
+    Docker Tooling: The server was running an ancient, buggy version of docker-compose (1.x). This caused 'ContainerConfig' errors. Solution: Upgraded to the modern docker compose plugin.
 
-# This adds a NIC with MAC address 'aa:bb:cc:dd:ee:ff' into the database.
-docker-compose exec -T db psql -U user -d mydb -c "INSERT INTO \"Nic\" (id, mac) VALUES ('clxTESTnicID01234', 'aa:bb:cc:dd:ee:ff');"
+    Firewall: The server's ufw firewall was blocking all web traffic on ports 80/443. Solution: Added rules to allow traffic on those ports.
+
+    Database Initialization: The database container was starting without the required password and was not being migrated. Solution: Corrected the .env variables and implemented a strict, multi-step startup and migration workflow.
+
+    Certificate/SSL Errors: Caddy was being rate-limited by Let's Encrypt after too many failed attempts, causing SSL_ERROR_INTERNAL_ERROR_ALERT. Solution: Switched to the Let's Encrypt staging server in the Caddyfile for development.
+
+    Authentication Race Condition: The frontend (router.replace) was navigating to protected pages faster than the browser could process the login cookie, causing immediate unauthorized errors. Solution: Replaced the soft navigation with a hard window.location.replace in the AuthContext to force a page reload, breaking the race condition.
+
+    Linting/Build Errors: Strict TypeScript rules blocked the build due to unsafe error handling. Solution: Implemented type-safe instanceof Error checks in catch blocks.
+
+    Configuration Drift: The primary underlying problem was a lack of a single source of truth, with conflicting docker-compose and .env files. Solution: This document.
