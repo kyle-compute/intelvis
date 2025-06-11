@@ -1,17 +1,15 @@
-// frontend/context/AuthContext.tsx - FINAL & CORRECTED
+// frontend/context/AuthContext.tsx - THE FINAL, CORRECTED VERSION
 "use client"
 
 import { createContext, useContext, useState, useEffect, ReactNode } from "react"
 import { useRouter } from "next/navigation"
 
-// Define the shape of the user object
 interface User {
   id: string
   email: string
   createdAt: string
 }
 
-// Define the shape of the context value
 interface AuthContextType {
   user: User | null
   isLoading: boolean
@@ -21,7 +19,6 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-// Get the API URL from the environment variable provided at build time.
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -31,24 +28,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const checkUserStatus = async () => {
-      if (!API_URL) {
-        setIsLoading(false);
-        return;
-      }
       try {
-        // FIX: Add `credentials: 'include'` to send the auth cookie.
+        // THIS IS THE FIX: Tell the browser to send the auth cookie.
         const response = await fetch(`${API_URL}/api/auth/me`, {
           credentials: 'include'
         });
-
         if (response.ok) {
-          const userData = await response.json();
-          setUser(userData);
+          setUser(await response.json());
         } else {
           setUser(null);
         }
       } catch (error) {
-        console.error("Failed to check user status:", error);
         setUser(null);
       } finally {
         setIsLoading(false);
@@ -63,14 +53,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     try {
-      // FIX: Add `credentials: 'include'` to ensure the correct session is logged out.
+      // THIS IS THE FIX: Tell the browser to send the auth cookie for logout.
       await fetch(`${API_URL}/api/auth/logout`, {
         method: "POST",
         credentials: 'include'
       });
     } finally {
       setUser(null);
-      // Redirect to login page after logging out
       router.push("/login");
     }
   }
@@ -82,7 +71,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   )
 }
 
-// Custom hook to use the AuthContext
 export const useAuth = () => {
   const context = useContext(AuthContext)
   if (context === undefined) {
