@@ -2,7 +2,8 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import prisma from '../lib/db.js'; // <-- FIX: Import shared instance
+import prisma from '../lib/db.js';
+
 import { protect } from '../middleware/protect.js';
 
 const router = Router();

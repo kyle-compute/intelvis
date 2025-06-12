@@ -1,14 +1,9 @@
-// backend/lib/db.js
+// backend/lib/db.js  (or prisma.js)
+
 import { PrismaClient } from '@prisma/client';
 
-// This pattern ensures that in a development environment (where module caching can be flushed),
-// you don't end up with a bunch of orphaned connections.
-const globalForPrisma = globalThis;
+// keep one instance in dev to avoid “too many clients” hot-reload leaks
+const prisma = globalThis.prisma || new PrismaClient();
+if (process.env.NODE_ENV !== 'production') globalThis.prisma = prisma;
 
-const prisma = globalForPrisma.prisma || new PrismaClient();
-
-if (process.env.NODE_ENV !== 'production') {
-  globalForPrisma.prisma = prisma;
-}
-
-export default prisma;
+export default prisma;               // default ESM export

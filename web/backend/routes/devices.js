@@ -1,6 +1,7 @@
 // backend/routes/devices.js - FINAL
 import { Router } from 'express';
-import prisma from '../lib/db.js'; // <-- FIX: Import shared instance
+import prisma from '../lib/db.js';
+
 import { protect } from '../middleware/protect.js';
 
 const router = Router();
