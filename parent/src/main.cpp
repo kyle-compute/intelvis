@@ -7,6 +7,7 @@ const char* password = "9sophie2011";
 
 
 const char* serverName = "https://intelvis.ai/api/provision";
+const char* pingServerName = "https://intelvis.ai/api/devices/ping";
 const char* apiKey = "another-very-strong-secret-key";
 
 
@@ -66,9 +67,51 @@ void setup() {
   provisionDevice();
 }
 
+void pingServer() {
+  if (WiFi.status() == WL_CONNECTED) {
+    HTTPClient http;
+    http.begin(pingServerName);
+    http.addHeader("Content-Type", "application/json");
+
+    String macAddress = WiFi.macAddress();
+    macAddress.toLowerCase();
+
+    StaticJsonDocument<100> doc;
+    doc["mac"] = macAddress;
+    String requestBody;
+    serializeJson(doc, requestBody);
+
+    Serial.print("Pinging server with MAC: ");
+    Serial.println(macAddress);
+
+    int httpResponseCode = http.POST(requestBody);
+
+    if (httpResponseCode > 0) {
+      String response = http.getString();
+      Serial.print("Ping response code: ");
+      Serial.println(httpResponseCode);
+      Serial.println(response);
+    } else {
+      Serial.print("Error on ping: ");
+      Serial.println(httpResponseCode);
+    }
+
+    http.end();
+  } else {
+    Serial.println("WiFi Disconnected. Cannot ping.");
+  }
+}
+
 void loop() {
-  // Your device's main logic goes here (reading sensors, etc.)
-  delay(10000);
+  static unsigned long lastPing = 0;
+  unsigned long currentTime = millis();
+  
+  if (currentTime - lastPing >= 60000) {
+    pingServer();
+    lastPing = currentTime;
+  }
+  
+  delay(1000);
 }
 
 // #include <Arduino.h>

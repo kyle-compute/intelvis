@@ -3,12 +3,12 @@
  */
 "use client";
 
-import { useState, useEffect } from "react";
-import { Loader2 } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { Loader2, Wifi, WifiOff } from "lucide-react";
 import { toast } from "sonner";
 
 import { useAuth } from "@/context/AuthContext";
-import type { Device } from "@/types";
+import type { Device, DeviceConnectivity } from "@/types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://intelvis.ai';
 
@@ -18,43 +18,65 @@ export default function DashboardPage() {
   // Device state
   const [devices, setDevices] = useState<Device[]>([]);
   const [isLoadingDevices, setIsLoadingDevices] = useState(true);
+  const [connectivityData, setConnectivityData] = useState<DeviceConnectivity[]>([]);
   
   // Form state
   const [macAddress, setMacAddress] = useState("");
   const [isPairingDevice, setIsPairingDevice] = useState(false);
 
-  useEffect(() => {
-    const fetchDevices = async () => {
-      // Wait for auth check to complete
-      if (!isAuthCheckComplete) return;
-      
-      // Redirect if no user found
-      if (!user) {
-        setIsLoadingDevices(false);
-        return;
-      }
+  const fetchDevices = useCallback(async () => {
+    // Wait for auth check to complete
+    if (!isAuthCheckComplete) return;
+    
+    // Redirect if no user found
+    if (!user) {
+      setIsLoadingDevices(false);
+      return;
+    }
 
-      setIsLoadingDevices(true);
-      try {
-        const response = await fetch(`${API_URL}/api/devices`, { credentials: 'include' });
-        if (response.ok) {
-          setDevices(await response.json());
-        } else if (response.status === 401) {
-          toast.error("Session expired. Please log in again.");
-          logout();
-        } else {
-          toast.error("Failed to fetch devices.");
-        }
-      } catch (error) {
-        console.error("Error fetching devices:", error);
-        toast.error("Failed to load devices.");
-      } finally {
-        setIsLoadingDevices(false);
+    setIsLoadingDevices(true);
+    try {
+      const response = await fetch(`${API_URL}/api/devices`, { credentials: 'include' });
+      if (response.ok) {
+        setDevices(await response.json());
+      } else if (response.status === 401) {
+        toast.error("Session expired. Please log in again.");
+        logout();
+      } else {
+        toast.error("Failed to fetch devices.");
       }
-    };
-
-    fetchDevices();
+    } catch (error) {
+      console.error("Error fetching devices:", error);
+      toast.error("Failed to load devices.");
+    } finally {
+      setIsLoadingDevices(false);
+    }
   }, [user, isAuthCheckComplete, logout]);
+
+  const fetchConnectivity = useCallback(async () => {
+    if (!user) return;
+    
+    try {
+      const response = await fetch(`${API_URL}/api/devices/connectivity`, { credentials: 'include' });
+      if (response.ok) {
+        setConnectivityData(await response.json());
+      }
+    } catch (error) {
+      console.error("Error fetching connectivity:", error);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    fetchDevices();
+  }, [fetchDevices]);
+
+  useEffect(() => {
+    if (user) {
+      fetchConnectivity();
+      const interval = setInterval(fetchConnectivity, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [user, fetchConnectivity]);
 
   const handlePairDevice = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -77,6 +99,7 @@ export default function DashboardPage() {
         toast.success("Device paired successfully!");
         setDevices(prev => [...prev, newDevice]);
         setMacAddress('');
+        fetchConnectivity();
       } else if (response.status === 401) {
         toast.error("Session expired. Please log in again.");
         logout();
@@ -142,17 +165,43 @@ export default function DashboardPage() {
             </div>
           ) : devices.length > 0 ? (
             <div className="space-y-4">
-              {devices.map(device => (
-                <div key={device.id} className="bg-gray-900 p-4 rounded-lg flex justify-between items-center">
-                  <div>
-                    <p className="font-bold">{device.alias || `Device ${device.id.slice(-6)}`}</p>
-                    <p className="text-sm text-gray-400">{device.nic?.mac}</p>
+              {devices.map(device => {
+                const connectivity = connectivityData.find(c => c.deviceId === device.id);
+                const isOnline = connectivity?.isConnected || false;
+                const minutesAgo = connectivity?.minutesAgo || 0;
+                
+                return (
+                  <div key={device.id} className="bg-gray-900 p-4 rounded-lg">
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="font-bold">{device.alias || `Device ${device.id.slice(-6)}`}</p>
+                          <div className="flex items-center gap-1">
+                            {isOnline ? (
+                              <Wifi className="w-4 h-4 text-green-400" />
+                            ) : (
+                              <WifiOff className="w-4 h-4 text-red-400" />
+                            )}
+                            <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-green-400' : 'bg-red-400'}`}></div>
+                          </div>
+                        </div>
+                        <p className="text-sm text-gray-400">{device.nic?.mac}</p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {isOnline ? 'Online' : `Last seen ${minutesAgo} minutes ago`}
+                        </p>
+                      </div>
+                      <div className="flex flex-col items-end gap-2">
+                        <span className={`px-2 py-1 text-xs font-bold rounded-full ${device.status === 'ACTIVE' ? 'bg-green-500/20 text-green-400' : 'bg-gray-500/20 text-gray-400'}`}>
+                          {device.status}
+                        </span>
+                        <span className={`px-2 py-1 text-xs font-bold rounded-full ${isOnline ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                          {isOnline ? 'ONLINE' : 'OFFLINE'}
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                  <span className={`px-2 py-1 text-xs font-bold rounded-full ${device.status === 'ACTIVE' ? 'bg-green-500/20 text-green-400' : 'bg-gray-500/20 text-gray-400'}`}>
-                    {device.status}
-                  </span>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <p className="text-gray-500">You have no devices yet. Add one to get started.</p>

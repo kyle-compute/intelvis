@@ -12,7 +12,27 @@ router.get('/', async (req, res, next) => {
       where: { ownerId: req.user.id },
       include: { nic: true },
     });
-    res.status(200).json(devices);
+    
+    const devicesWithConnectivity = devices.map(device => {
+      const lastSeen = device.updatedAt;
+      const now = new Date();
+      const timeDiff = now - lastSeen;
+      const minutesAgo = Math.floor(timeDiff / (1000 * 60));
+      
+      const isConnected = minutesAgo <= 5;
+      
+      return {
+        ...device,
+        connectivity: {
+          isConnected,
+          lastSeen,
+          minutesAgo,
+          status: isConnected ? 'ONLINE' : 'OFFLINE'
+        }
+      };
+    });
+    
+    res.status(200).json(devicesWithConnectivity);
   } catch (error) {
     next(error);
   }
@@ -103,6 +123,89 @@ router.post('/', async (req, res, next) => {
     console.error('ERROR in pairing process:', error);
     console.error('Error stack:', error.stack);
     console.log('--- END DEBUG (ERROR) ---');
+    next(error);
+  }
+});
+
+router.post('/ping', async (req, res, next) => {
+  const { mac: rawMac } = req.body;
+  
+  console.log('--- DEVICE PING DEBUG ---');
+  console.log('Raw MAC from ping:', rawMac);
+  
+  if (!rawMac) {
+    console.log('ERROR: MAC required for ping');
+    return res.status(400).json({ message: 'MAC required' });
+  }
+  
+  const mac = rawMac.toLowerCase().trim();
+  console.log('Processed MAC for ping:', mac);
+
+  try {
+    const nic = await prisma.nic.findUnique({ 
+      where: { mac },
+      include: { device: true }
+    });
+    
+    if (!nic || !nic.device) {
+      console.log('ERROR: Device not found for ping');
+      return res.status(404).json({ message: 'Device not found' });
+    }
+
+    const device = nic.device;
+    console.log('Device ping from:', device.id);
+    
+    await prisma.device.update({
+      where: { id: device.id },
+      data: { 
+        updatedAt: new Date(),
+        status: 'ACTIVE'
+      }
+    });
+    
+    console.log('SUCCESS: Device ping recorded');
+    console.log('--- END PING DEBUG ---');
+    res.status(200).json({ 
+      message: 'Ping received',
+      deviceId: device.id,
+      status: 'ACTIVE'
+    });
+    
+  } catch (error) {
+    console.error('ERROR in ping process:', error);
+    console.log('--- END PING DEBUG (ERROR) ---');
+    next(error);
+  }
+});
+
+router.get('/connectivity', async (req, res, next) => {
+  try {
+    const devices = await prisma.device.findMany({
+      where: { ownerId: req.user.id },
+      include: { nic: true },
+    });
+    
+    const connectivityStatus = devices.map(device => {
+      const lastSeen = device.updatedAt;
+      const now = new Date();
+      const timeDiff = now - lastSeen;
+      const minutesAgo = Math.floor(timeDiff / (1000 * 60));
+      
+      const isConnected = minutesAgo <= 5;
+      
+      return {
+        deviceId: device.id,
+        mac: device.nic?.mac,
+        isConnected,
+        lastSeen,
+        minutesAgo,
+        status: isConnected ? 'ONLINE' : 'OFFLINE',
+        deviceStatus: device.status
+      };
+    });
+    
+    res.status(200).json(connectivityStatus);
+  } catch (error) {
     next(error);
   }
 });

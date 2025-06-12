@@ -14,6 +14,16 @@ export interface Device {
   nic: { mac: string } | null;
 }
 
+export interface DeviceConnectivity {
+  deviceId: string;
+  mac: string | null;
+  isConnected: boolean;
+  lastSeen: string;
+  minutesAgo: number;
+  status: 'ONLINE' | 'OFFLINE';
+  deviceStatus: string;
+}
+
 export interface AuthContextType {
   user: User | null;
   isLoading: boolean;
