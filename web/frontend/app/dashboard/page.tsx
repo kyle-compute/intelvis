@@ -4,7 +4,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Loader2, Wifi, WifiOff } from "lucide-react";
+import { Loader2, Wifi, WifiOff, Edit2, Check, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { useAuth } from "@/context/AuthContext";
@@ -23,6 +23,11 @@ export default function DashboardPage() {
   // Form state
   const [macAddress, setMacAddress] = useState("");
   const [isPairingDevice, setIsPairingDevice] = useState(false);
+  
+  // Rename state
+  const [editingDeviceId, setEditingDeviceId] = useState<string | null>(null);
+  const [editingAlias, setEditingAlias] = useState("");
+  const [isRenaming, setIsRenaming] = useState(false);
 
   const fetchDevices = useCallback(async () => {
     // Wait for auth check to complete
@@ -114,6 +119,52 @@ export default function DashboardPage() {
     }
   };
 
+  const startRename = (device: Device) => {
+    setEditingDeviceId(device.id);
+    setEditingAlias(device.alias || "");
+  };
+
+  const cancelRename = () => {
+    setEditingDeviceId(null);
+    setEditingAlias("");
+  };
+
+  const saveRename = async (deviceId: string) => {
+    if (!editingAlias.trim()) {
+      toast.error("Device name cannot be empty");
+      return;
+    }
+
+    setIsRenaming(true);
+    try {
+      const response = await fetch(`${API_URL}/api/devices/${deviceId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ alias: editingAlias.trim() }),
+        credentials: 'include'
+      });
+
+      if (response.ok) {
+        const updatedDevice = await response.json();
+        setDevices(prev => prev.map(d => d.id === deviceId ? updatedDevice : d));
+        toast.success("Device renamed successfully!");
+        setEditingDeviceId(null);
+        setEditingAlias("");
+      } else if (response.status === 401) {
+        toast.error("Session expired. Please log in again.");
+        logout();
+      } else {
+        const error = await response.json();
+        toast.error(error.message || "Failed to rename device");
+      }
+    } catch (error) {
+      console.error("Error renaming device:", error);
+      toast.error("Failed to rename device");
+    } finally {
+      setIsRenaming(false);
+    }
+  };
+
   if (!isAuthCheckComplete) {
     return <div className="p-8 text-center text-gray-500">Initializing...</div>;
   }
@@ -175,7 +226,49 @@ export default function DashboardPage() {
                     <div className="flex justify-between items-start">
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
-                          <p className="font-bold">{device.alias || `Device ${device.id.slice(-6)}`}</p>
+                          {editingDeviceId === device.id ? (
+                            <div className="flex items-center gap-2 flex-1">
+                              <input
+                                type="text"
+                                value={editingAlias}
+                                onChange={(e) => setEditingAlias(e.target.value)}
+                                className="bg-gray-800 border border-gray-600 rounded px-2 py-1 text-white focus:ring-2 focus:ring-blue-500 focus:outline-none flex-1"
+                                placeholder="Enter device name"
+                                disabled={isRenaming}
+                                maxLength={50}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') saveRename(device.id);
+                                  if (e.key === 'Escape') cancelRename();
+                                }}
+                                autoFocus
+                              />
+                              <button
+                                onClick={() => saveRename(device.id)}
+                                disabled={isRenaming}
+                                className="p-1 text-green-400 hover:text-green-300 disabled:opacity-50"
+                              >
+                                {isRenaming ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                              </button>
+                              <button
+                                onClick={cancelRename}
+                                disabled={isRenaming}
+                                className="p-1 text-red-400 hover:text-red-300 disabled:opacity-50"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
+                          ) : (
+                            <>
+                              <p className="font-bold">{device.alias || `Device ${device.id.slice(-6)}`}</p>
+                              <button
+                                onClick={() => startRename(device)}
+                                className="p-1 text-gray-400 hover:text-gray-300"
+                                title="Rename device"
+                              >
+                                <Edit2 className="w-3 h-3" />
+                              </button>
+                            </>
+                          )}
                           <div className="flex items-center gap-1">
                             {isOnline ? (
                               <Wifi className="w-4 h-4 text-green-400" />

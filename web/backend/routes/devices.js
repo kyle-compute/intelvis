@@ -210,4 +210,58 @@ router.get('/connectivity', async (req, res, next) => {
   }
 });
 
+router.put('/:deviceId', async (req, res, next) => {
+  const { deviceId } = req.params;
+  const { alias } = req.body;
+  
+  console.log('--- DEVICE RENAME DEBUG ---');
+  console.log('Device ID:', deviceId);
+  console.log('New alias:', alias);
+  console.log('User ID:', req.user.id);
+  
+  if (!alias || typeof alias !== 'string' || alias.trim().length === 0) {
+    console.log('ERROR: Invalid alias provided');
+    return res.status(400).json({ message: 'Valid alias is required' });
+  }
+  
+  const trimmedAlias = alias.trim();
+  
+  if (trimmedAlias.length > 50) {
+    console.log('ERROR: Alias too long');
+    return res.status(400).json({ message: 'Alias must be 50 characters or less' });
+  }
+
+  try {
+    const device = await prisma.device.findUnique({
+      where: { id: deviceId },
+      include: { nic: true }
+    });
+    
+    if (!device) {
+      console.log('ERROR: Device not found');
+      return res.status(404).json({ message: 'Device not found' });
+    }
+    
+    if (device.ownerId !== req.user.id) {
+      console.log('ERROR: User does not own this device');
+      return res.status(403).json({ message: 'Access denied' });
+    }
+    
+    const updatedDevice = await prisma.device.update({
+      where: { id: deviceId },
+      data: { alias: trimmedAlias },
+      include: { nic: true }
+    });
+    
+    console.log('SUCCESS: Device renamed');
+    console.log('--- END RENAME DEBUG ---');
+    res.status(200).json(updatedDevice);
+    
+  } catch (error) {
+    console.error('ERROR in device rename:', error);
+    console.log('--- END RENAME DEBUG (ERROR) ---');
+    next(error);
+  }
+});
+
 export default router;

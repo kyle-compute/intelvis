@@ -5,7 +5,19 @@ Implemented a comprehensive device connectivity monitoring system that allows ES
 
 ## Changes Made
 
-### 1. Backend API Changes (`web/backend/routes/devices.js`)
+### 1. Navbar Logo Update (`web/frontend/components/ui/navbar.tsx`)
+- **Logo Redirect**: Logo now always redirects to home page (`/`) for all users
+- Previously redirected authenticated users to `/dashboard`, now consistently goes to `/`
+
+### 2. Device Renaming Feature
+
+#### Backend API Changes (`web/backend/routes/devices.js`)
+- **PUT `/api/devices/:deviceId`**: New endpoint for updating device aliases
+  - Accepts `alias` in request body (max 50 characters)
+  - Validates device ownership and permissions
+  - Updates device alias in database
+
+### 3. Backend API Changes (`web/backend/routes/devices.js`)
 
 #### New Endpoints Added:
 - **POST `/api/devices/ping`**: Receives ping requests from ESP32 devices
@@ -38,22 +50,43 @@ Implemented a comprehensive device connectivity monitoring system that allows ES
 - Added `pingServerName` constant pointing to ping endpoint
 - Preserved existing provisioning functionality
 
+#### Frontend Changes (`web/frontend/app/dashboard/page.tsx`)
+- **Rename UI**: Inline editing with save/cancel buttons
+- **Keyboard Support**: Enter to save, Escape to cancel
+- **Loading States**: Spinner during rename operation
+- **Type Safety**: Added proper TypeScript interfaces
+
 ### 3. Frontend Dashboard Changes (`web/frontend/app/dashboard/page.tsx`)
+
+#### Device Renaming Feature:
+- **Inline Editing**: Click edit icon next to device name to rename
+- **Keyboard Shortcuts**: Enter to save, Escape to cancel  
+- **Real-time Updates**: Device list updates immediately after successful rename
+- **Validation**: Empty names prevented, 50 character limit enforced
+- **Visual Feedback**: Loading spinner during rename operation
+
+#### Enhanced Type Safety (`web/frontend/types/index.ts`):
+- Added `DeviceConnectivity` interface for proper TypeScript support
+- Replaced `any` types with proper type definitions
 
 #### New Visual Indicators:
 - **Connectivity Status Icons**: Added WiFi/WiFiOff icons from Lucide React
 - **Status Dots**: Green/red circular indicators showing real-time connectivity
 - **Dual Status Display**: Shows both device status (ACTIVE/INACTIVE) and connectivity (ONLINE/OFFLINE)
+- **Edit Icons**: Small edit button next to device names for renaming
 
 #### Enhanced Device Display:
 - Reorganized device cards to show more detailed information
 - Added "Last seen X minutes ago" for offline devices
 - Real-time status updates every 30 seconds
+- Inline editing interface for device names
 
 #### New State Management:
 - Added `connectivityData` state to store real-time connectivity info
+- Added rename state management (`editingDeviceId`, `editingAlias`, `isRenaming`)
 - Implemented `fetchConnectivity()` function with automatic refresh
 - Updates connectivity status after device pairing
+- Proper useCallback and useEffect dependency management
 
 ## Technical Implementation Details
 
@@ -84,14 +117,20 @@ Implemented a comprehensive device connectivity monitoring system that allows ES
 2. Green indicators = Device is online and responding
 3. Red indicators = Device is offline (no ping for >5 minutes)
 4. Automatic refresh every 30 seconds
+5. Click edit icon next to device name to rename devices
+6. Logo always redirects to home page
 
 ## Files Modified:
-- `web/backend/routes/devices.js` - Added ping and connectivity endpoints
-- `parent/src/main.cpp` - Added periodic ping functionality
-- `web/frontend/app/dashboard/page.tsx` - Enhanced UI with connectivity indicators
+- `web/backend/routes/devices.js` - Added ping, connectivity, and device rename endpoints
+- `parent/src/main.cpp` - Added periodic ping functionality  
+- `web/frontend/app/dashboard/page.tsx` - Enhanced UI with connectivity indicators and device renaming
+- `web/frontend/components/ui/navbar.tsx` - Updated logo to always redirect to home page
+- `web/frontend/types/index.ts` - Added DeviceConnectivity interface for type safety
 
 ## Testing:
 - Backend dependencies installed successfully
 - All endpoints functional and responding correctly
 - Frontend properly displays connectivity status with visual indicators
+- Device renaming feature implemented with proper validation
+- TypeScript compilation passes without errors
 - ESP32 code compiled and ready for deployment

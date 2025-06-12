@@ -44,7 +44,7 @@ export function Navbar() {
 
   const isAuthed = isMounted && !!user;
   const navLinks = isAuthed ? dashboardNavLinks : publicNavLinks;
-  const logoHref = isAuthed ? "/dashboard" : "/";
+  const logoHref = "/";
 
   const renderAuthSection = (isMobile: boolean = false) => {
     if (!isMounted) {
