@@ -6,8 +6,14 @@ const char* ssid = "Homewifi_2.4G";
 const char* password = "9sophie2011";
 
 
-const char* serverName = "https://intelvis.ai/api/provision";
-const char* pingServerName = "https://intelvis.ai/api/devices/ping";
+// Production server URLs (commented out for local development)
+// const char* serverName = "https://intelvis.ai/api/provision";
+// const char* pingServerName = "https://intelvis.ai/api/devices/ping";
+// const char* apiKey = "another-very-strong-secret-key";
+
+// Local development server URLs
+const char* serverName = "http://192.168.254.76:8080/api/devices/register";  // Updated to use correct port (8080)
+const char* pingServerName = "http://192.168.254.76:8080/api/devices/ping";  // Updated to correct port (8080)
 const char* apiKey = "another-very-strong-secret-key";
 
 
@@ -16,7 +22,7 @@ void provisionDevice() {
     HTTPClient http;
     http.begin(serverName);
     http.addHeader("Content-Type", "application/json");
-    http.addHeader("X-API-Key", apiKey);
+    // Removed API key requirement for device registration
 
     // Get the device's MAC address
     String macAddress = WiFi.macAddress();

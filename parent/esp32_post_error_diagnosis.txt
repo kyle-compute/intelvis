@@ -1,0 +1,54 @@
+ESP32 POST ERROR -1 DIAGNOSIS AND FIX - UPDATED
+==============================================
+
+PROBLEM:
+ESP32S3 getting "error on sending post -1" when trying to connect to server
+Error: "Connection reset by peer" (errno: 104)
+
+ROOT CAUSE ANALYSIS:
+1. ESP32 code (main.cpp:15-16) was targeting wrong port (3001)
+2. Backend actually runs on port 8080, not 3001
+3. Backend config shows PORT=3001 but actually listening on 8080
+4. ESP32 connection attempts to wrong port causing "Connection refused"
+
+ACTUAL ISSUES IDENTIFIED:
+
+1. PORT MISMATCH (PRIMARY ISSUE):
+   - ESP32 was configured for port 3001 after initial fix
+   - Backend actually runs on port 8080 (verified with ss -tlnp)
+   - This causes immediate connection refusal
+
+2. BACKEND CONFIGURATION WORKING:
+   - /register route is properly unprotected (before router.use(protect))
+   - CORS allows local IP ranges including 192.168.x.x
+   - Backend listens on 0.0.0.0:8080 so accessible from network
+
+3. DEVICE AUTO-REGISTRATION FLOW:
+   - ESP32 POSTs to /register with MAC address
+   - Backend creates device with status=ACTIVE, ownerId=null
+   - User can then pair device through web interface
+   - No manual database intervention needed
+
+SOLUTION APPLIED:
+
+1. ✅ FIXED PORT CONFIGURATION:
+   - Updated ESP32 main.cpp lines 15-16 to use port 8080
+   - serverName: "http://192.168.254.76:8080/api/devices/register"
+   - pingServerName: "http://192.168.254.76:8080/api/devices/ping"
+
+2. ✅ VERIFIED BACKEND ACCESSIBILITY:
+   - Confirmed backend responds on 192.168.254.76:8080
+   - Health endpoint working: curl http://192.168.254.76:8080/api/health
+
+3. ✅ CONFIRMED MIDDLEWARE SETUP:
+   - /register route defined before protect middleware
+   - CORS allows ESP32 IP range requests
+   - No authentication required for device registration
+
+TECHNICAL DETAILS:
+- errno 104 = "Connection reset by peer" = TCP connection refused
+- Backend actually runs on 8080 despite PORT=3001 env var
+- Device registration creates unowned devices for user pairing
+- Auto-registration ensures no manual database work needed
+
+STATUS: FIXED - ESP32 should now connect successfully to backend

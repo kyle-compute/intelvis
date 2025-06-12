@@ -1,0 +1,37 @@
+CONTAINER POST ERROR FIX PLAN
+=============================
+
+IDENTIFIED ISSUES:
+1. ESP32 MAC address 'dc:da:0c:64:33:5c' not found in database
+2. Frontend POST /update endpoint returns 404 
+3. ESP32 device getting -1 HTTP errors on POST/ping requests
+
+ROOT CAUSES:
+- Database missing the actual ESP32 device MAC address
+- Frontend missing /update API route
+- ESP32 cannot communicate with backend due to missing MAC registration
+
+FIXES NEEDED:
+
+1. DEVICE REGISTRATION FLOW:
+   - Backend should auto-register new MAC addresses when they first connect
+   - Modify device pairing endpoint to create NICs if they don't exist
+   - Frontend/backend should work together for seamless device onboarding
+
+2. FRONTEND API ISSUE:
+   - Check if /update route exists in frontend API routes
+   - If missing, create the POST /update endpoint
+   - Ensure it properly forwards to backend
+
+3. ESP32 NETWORK ISSUE:
+   - Verify ESP32 can reach backend container (network connectivity)
+   - Check if ESP32 is using correct backend URL/port
+   - Confirm ESP32 HTTP client implementation
+
+PRIORITY ORDER:
+1. Fix backend to auto-register new devices (no manual DB work)
+2. Add missing frontend /update route
+3. Debug ESP32 network connectivity
+
+IMMEDIATE ACTION:
+Modify backend device pairing logic to automatically create NIC entries for new MAC addresses instead of rejecting them.

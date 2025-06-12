@@ -11,7 +11,16 @@ const port = process.env.PORT || 3001;
 
 // --- Security Middleware (CORS) ---
 const corsOptions = {
-  origin: 'https://intelvis.ai',
+  origin: [
+    'https://intelvis.ai',
+    'http://localhost:3000',
+    'http://localhost:3001', 
+    'http://127.0.0.1:3000',
+    'http://127.0.0.1:3001',
+    // Allow local network range for ESP32 devices
+    /^http:\/\/192\.168\.\d{1,3}\.\d{1,3}(:\d+)?$/,
+    /^http:\/\/10\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?$/
+  ],
   credentials: true,
 };
 app.options('*', cors(corsOptions)); // Pre-flight

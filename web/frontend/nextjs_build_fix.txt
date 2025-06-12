@@ -1,0 +1,43 @@
+NEXT.JS BUILD PERMISSION ERROR FIX PLAN
+==========================================
+
+PROBLEM:
+- Build fails with EACCES permission denied errors
+- Files in .next/build/ and .next/static/ directories are owned by root
+- Next.js cannot clean up these files during build process
+
+ROOT CAUSE:
+- Previous builds were likely run with sudo or as root user
+- This created files owned by root in the .next directory
+- Regular user (kel) cannot modify/delete these files
+
+SOLUTION OPTIONS:
+
+1. IMMEDIATE FIX (Recommended):
+   Run these commands:
+   ```
+   sudo rm -rf .next/
+   npm run build
+   ```
+
+2. OWNERSHIP FIX (Alternative):
+   ```
+   sudo chown -R kel:kel .next/
+   npm run build
+   ```
+
+3. PREVENTION (Long-term):
+   - Never run npm commands with sudo
+   - Always run builds as regular user
+   - If build fails, check file ownership before using sudo
+
+EXECUTION PLAN:
+1. Clear .next directory with elevated permissions
+2. Run clean build as regular user
+3. Verify build completes successfully
+4. Document this issue to prevent future occurrences
+
+WHY THIS HAPPENS:
+- Docker builds or previous sudo usage created root-owned files
+- Next.js build process needs write access to clean up old files
+- Permission mismatch prevents proper cleanup during turbopack compilation
