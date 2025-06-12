@@ -1,0 +1,283 @@
+# IntelVis System Architecture Documentation
+
+## Overview
+IntelVis is a comprehensive IoT compressed air leak detection system with a modern three-tier architecture: ESP32 firmware devices, Node.js/Express backend API, and Next.js frontend. The system enables real-time device monitoring, user authentication, and scalable IoT device management.
+
+## System Components
+
+### 1. Database Schema & Data Models
+
+**Core Design Philosophy:**
+- Logical vs Physical separation: Devices (logical entities) separate from NICs (physical hardware)
+- Time-series optimization: TimescaleDB for efficient telemetry storage
+- Hierarchical device management: PostgreSQL ltree for device trees
+
+**Database Tables:**
+
+```sql
+User {
+  id: String (cuid)
+  email: String (unique)
+  password: String (bcrypt hashed)
+  devices: Device[] (one-to-many)
+  createdAt/updatedAt: DateTime
+}
+
+Nic (Network Interface Card) {
+  id: String (cuid)
+  mac: String (unique, lowercase) - ESP32 MAC address
+  device: Device? (optional one-to-one)
+  deviceId: String?
+}
+
+Device {
+  id: String (cuid)
+  alias: String? (user-friendly name)
+  status: DeviceStatus (ACTIVE, INACTIVE, DECOMMISSIONED)
+  owner: User? (can be null during provisioning)
+  ownerId: String?
+  parent: Device? (for device hierarchies)
+  parentId: String?
+  children: Device[] (child devices)
+  nic: Nic (current physical hardware)
+  telemetry: Telemetry[] (time-series data)
+  createdAt/updatedAt: DateTime
+}
+
+Telemetry (TimescaleDB Hypertable) {
+  id: String
+  device: Device
+  deviceId: String
+  ownerId: String (denormalized for performance)
+  eventTs: DateTime (partition key)
+  leakRate: Float?
+  pressure: Float?
+  payload: Json (flexible data storage)
+}
+```
+
+### 2. Backend API Architecture
+
+**Technology Stack:**
+- Node.js with Express.js
+- Prisma ORM with PostgreSQL/TimescaleDB
+- JWT authentication with HTTP-only cookies
+- bcryptjs for password hashing
+
+**API Routes:**
+
+**Authentication Routes (`/api/auth`)**
+- `POST /register` - User registration
+- `POST /login` - JWT token generation
+- `GET /me` - Current user info (protected)
+- `POST /logout` - Token invalidation
+
+**Device Management Routes (`/api/devices`)**
+- `GET /` - List user devices with connectivity (protected)
+- `POST /` - Device pairing to user (protected)
+- `PUT /:deviceId` - Update device alias (protected)
+- `GET /connectivity` - Real-time connectivity status (protected)
+- `POST /register` - ESP32 auto-registration (public)
+- `POST /ping` - Device heartbeat (public)
+- `POST /update` - Device status updates (public)
+
+**Provisioning Routes (`/api/provision`)**
+- `POST /` - Factory device provisioning (API key protected)
+
+**Key Files:**
+- `backend/index.js` - Main server setup, CORS, error handling
+- `backend/routes/auth.js` - Authentication endpoints
+- `backend/routes/devices.js` - Device management with extensive logging
+- `backend/routes/provision.js` - Factory provisioning
+- `backend/middleware/protect.js` - JWT authentication middleware
+- `backend/lib/db.js` - Prisma client setup
+- `backend/prisma/schema.prisma` - Database schema definition
+
+### 3. Frontend Architecture
+
+**Technology Stack:**
+- Next.js 15 with React 19
+- TailwindCSS with custom components
+- React Context for authentication state
+- React Hook Form with Zod validation
+- Radix UI primitives for accessible components
+
+**Key Pages:**
+- `/` - Marketing landing page with 3D models and features
+- `/login` - User authentication
+- `/register` - User registration
+- `/dashboard` - Protected device management interface
+- `/analytics` - Interactive network topology visualization
+
+**Core Components:**
+- `components/ui/navbar.tsx` - Navigation with auth state
+- `components/ui/AddDeviceForm.tsx` - Device pairing form
+- `components/landing/*` - Marketing page components
+- `context/AuthContext.tsx` - Global authentication state
+- `app/layout.tsx` - Root layout with auth provider
+
+**Key Features:**
+- Real-time device connectivity status
+- Visual indicators (green/red dots for online/offline)
+- Device renaming functionality
+- Interactive drag-and-drop network topology
+- Responsive design with mobile support
+
+### 4. ESP32 Firmware
+
+**Platform:** ESP32-S3 DevKit with Wi-Fi connectivity
+
+**Core Behavior:**
+1. **Startup:** Connect to Wi-Fi, auto-register with backend
+2. **Operation:** Send heartbeat every 60 seconds
+3. **Communication:** HTTP POST with JSON payloads
+
+**Key Functions:**
+- `provisionDevice()` - Initial registration with MAC address
+- `pingServer()` - Periodic heartbeat to maintain connectivity
+- MAC address used as unique device identifier
+
+**Configuration:**
+- Supports both development and production server URLs
+- Configurable Wi-Fi credentials
+- Error handling for connection failures
+
+### 5. Device Registration & Pairing Workflow
+
+**Complete Device Lifecycle:**
+
+1. **ESP32 Auto-Registration:**
+   ```
+   ESP32 Boot → POST /api/devices/register
+   - Sends MAC address
+   - Backend creates Device (status: ACTIVE, ownerId: null)
+   - Creates linked Nic record
+   ```
+
+2. **User Pairing:**
+   ```
+   User Dashboard → Enter MAC → POST /api/devices
+   - Finds device by MAC address
+   - Assigns device to current user (sets ownerId)
+   - Device becomes visible in user's dashboard
+   ```
+
+3. **Ongoing Communication:**
+   ```
+   ESP32 → POST /api/devices/ping (every 60s)
+   - Updates device.updatedAt timestamp
+   - Enables connectivity status calculation
+   ```
+
+### 6. Connectivity & Status Management
+
+**Status Types:**
+- **Device Status:** ACTIVE, INACTIVE, DECOMMISSIONED (manually set)
+- **Connectivity Status:** ONLINE, OFFLINE (calculated from last ping)
+
+**Connectivity Logic:**
+- Online: Last ping within 5 minutes
+- Offline: No ping for >5 minutes
+- Frontend polls `/api/devices/connectivity` every 30 seconds
+- Real-time visual updates in dashboard
+
+### 7. Development Environment
+
+**Docker Compose Setup:**
+- **Caddy (Port 8080):** Reverse proxy routing
+  - `/api/*` → Backend service
+  - `/*` → Frontend service
+- **Frontend:** Next.js development server
+- **Backend:** Node.js with live reload
+- **Database:** TimescaleDB with persistent volumes
+
+**Key Configuration Files:**
+- `docker-compose.dev.yml` - Development container setup
+- `Caddyfile.dev` - Reverse proxy configuration
+- `backend/Dockerfile` - Backend container
+- `frontend/Dockerfile` - Frontend container
+
+### 8. Data Flow Patterns
+
+**Device-to-Cloud:**
+```
+ESP32 → HTTP POST → Caddy (Port 8080) → Backend API → PostgreSQL/TimescaleDB
+```
+
+**User Interface:**
+```
+Browser → Caddy → Frontend → Backend API → Database → Real-time UI Updates
+```
+
+**Authentication:**
+```
+Login Form → Backend Auth → JWT Cookie → Protected API Access
+```
+
+**Device Management:**
+```
+MAC Input → Device Lookup → Ownership Assignment → Status Updates
+```
+
+### 9. Security & Scalability
+
+**Security Features:**
+- JWT tokens in HTTP-only cookies (XSS protection)
+- bcrypt password hashing
+- CORS configuration for allowed origins
+- API key protection for provisioning endpoints
+- Public device endpoints (no auth) for ESP32 communication
+
+**Scalability Features:**
+- TimescaleDB hypertables for time-series data
+- Stateless backend design
+- Containerized deployment
+- Database indexing and query optimization
+- Separation of logical and physical device concepts
+
+### 10. Key Technical Decisions
+
+**Why separate Device and Nic?**
+- Enables hardware replacement without losing device history
+- Logical device identity persists across hardware changes
+- Simplifies device management and ownership
+
+**Why public ESP32 endpoints?**
+- Devices can't authenticate before registration
+- Enables plug-and-play device deployment
+- MAC address provides sufficient device identification
+
+**Why TimescaleDB?**
+- Optimized for time-series telemetry data
+- Efficient compression and partitioning
+- Scales to billions of data points
+
+**Why HTTP-only cookies?**
+- Prevents XSS attacks on JWT tokens
+- Automatic inclusion in requests
+- Secure token storage
+
+## File Structure Summary
+
+```
+intelvis/
+├── web/
+│   ├── backend/               # Node.js/Express API
+│   │   ├── routes/           # API endpoints
+│   │   ├── middleware/       # Authentication & protection
+│   │   ├── prisma/          # Database schema & migrations
+│   │   └── lib/             # Database client
+│   ├── frontend/             # Next.js React application
+│   │   ├── app/             # Next.js app router pages
+│   │   ├── components/      # React components
+│   │   ├── context/         # Authentication context
+│   │   └── lib/             # Utilities
+│   ├── docker-compose.dev.yml # Development environment
+│   └── Caddyfile.dev         # Reverse proxy config
+├── parent/                   # ESP32 firmware
+│   ├── src/main.cpp         # Main firmware code
+│   └── platformio.ini       # PlatformIO configuration
+└── README.md                # Project documentation
+```
+
+This architecture provides a robust, scalable foundation for IoT device management with real-time monitoring, secure authentication, and efficient data handling capabilities.
