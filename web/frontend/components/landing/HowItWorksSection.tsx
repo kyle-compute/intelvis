@@ -1,6 +1,7 @@
 // frontend/components/landing/HowItWorksSection.tsx
 'use client';
 import dynamic from 'next/dynamic';
+import { useScrollAnimation, fadeInUpVariants, scaleInVariants } from '@/lib/useScrollAnimation';
 
 const ImageCarousel = dynamic(() => import('./ImageCarousel').then(mod => mod.ImageCarousel), {
   ssr: false,
@@ -13,15 +14,24 @@ const ModelViewer = dynamic(() => import('./ModelViewer'), {
 });
 
 export function HowItWorksSection() {
+  const { elementRef: titleRef, isVisible: titleVisible } = useScrollAnimation<HTMLHeadingElement>();
+  const { elementRef: stepsRef, isVisible: stepsVisible } = useScrollAnimation<HTMLDivElement>();
+  const { elementRef: mediaRef, isVisible: mediaVisible } = useScrollAnimation<HTMLDivElement>();
+
   return (
-    <section className="border-t border-gray-900 px-4 py-20 md:py-28">
+    <section className="border-t border-gray-900 px-4 py-12 sm:py-20 md:py-28">
       <div className="mx-auto max-w-7xl">
-        <h2 className="mb-16 text-center text-3xl font-bold text-gray-50 md:text-4xl">
+        <h2 
+          ref={titleRef}
+          className={`mb-16 text-center text-3xl font-bold text-gray-50 md:text-4xl ${fadeInUpVariants.hidden} ${titleVisible ? fadeInUpVariants.visible : ''}`}
+        >
           From Hidden Problem to Actionable Alert
         </h2>
 
-        {/* ... (no changes to the steps section) ... */}
-        <div className="mb-20 grid gap-10 text-center md:grid-cols-3">
+        <div 
+          ref={stepsRef}
+          className={`mb-20 grid gap-10 text-center md:grid-cols-3 ${fadeInUpVariants.hidden} ${stepsVisible ? fadeInUpVariants.visible : ''}`}
+        >
           {[
             { title: 'Mount in Minutes', description: 'Zip-tie the sensor near any potential leak point. Two-year battery. No wires.' },
             { title: 'Listen Continuously', description: 'The sensor passively monitors for the unique ultrasonic signature of a leak.' },
@@ -37,8 +47,10 @@ export function HowItWorksSection() {
           ))}
         </div>
 
-        {/* --- FIX: Use `items-stretch` to make grid children equal height --- */}
-        <div className="grid items-stretch gap-10 md:grid-cols-2">
+        <div 
+          ref={mediaRef}
+          className={`grid items-stretch gap-10 md:grid-cols-2 ${scaleInVariants.hidden} ${mediaVisible ? scaleInVariants.visible : ''}`}
+        >
           <ImageCarousel />
           <ModelViewer />
         </div>

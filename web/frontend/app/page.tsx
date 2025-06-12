@@ -17,15 +17,22 @@ export const metadata: Metadata = {
 // This is now your root page component
 export default function LandingPage() {
   return (
-    <div className="bg-black text-white">
-      <main id="main-content">
+    <div className="relative min-h-screen bg-black text-white">
+      {/* Opaque gradient background */}
+      <div className="fixed inset-0 bg-gradient-to-br from-black via-gray-900 to-black opacity-95 pointer-events-none" />
+      <div className="fixed inset-0 bg-gradient-to-t from-blue-950/20 via-transparent to-purple-950/20 opacity-60 pointer-events-none" />
+      
+      {/* Content */}
+      <div className="relative z-10">
+        <main id="main-content">
         <HeroSection />
         <WhoIsItForSection />
         <HowItWorksSection />
         <WedgeInsightSection />
-        <CtaFormSection />
-      </main>
-      <Footer />
+          <CtaFormSection />
+        </main>
+        <Footer />
+      </div>
     </div>
   );
 }
