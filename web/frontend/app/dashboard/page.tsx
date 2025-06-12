@@ -6,7 +6,7 @@ import { useAuth } from "@/context/AuthContext"
 import { toast } from "sonner"
 import { Loader2 } from "lucide-react" // This is now used in the JSX
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 interface Device {
   id: string;

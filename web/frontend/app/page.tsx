@@ -13,7 +13,7 @@ export const metadata: Metadata = {
   title: "IntelVis",
   description: "IntelVis finds compressed air leaks before they cost you thousands. Simple sensors, real-time alerts. No audits needed. Get early access.",
 };
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
+
 // This is now your root page component
 export default function LandingPage() {
   return (
