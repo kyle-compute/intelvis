@@ -8,14 +8,10 @@ WORKDIR /app
 
 # Copy package files and install dependencies first (for better caching)
 COPY package*.json ./
-RUN npm ci --only=production
+RUN npm ci --omit=dev || npm ci --production || npm install --production
 
 # Copy the entire codebase
 COPY . .
-
-# Make the init script executable
-COPY scripts/init.sh /usr/local/bin/init.sh
-RUN chmod +x /usr/local/bin/init.sh
 
 # Generate Prisma Client at build time (for faster startup)
 RUN npx prisma generate
@@ -23,5 +19,5 @@ RUN npx prisma generate
 # Expose the port
 EXPOSE 3001
 
-# Use the initialization script
-CMD ["/usr/local/bin/init.sh"]
+# Start the application directly
+CMD ["npm", "start"]
