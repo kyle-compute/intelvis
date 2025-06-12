@@ -1,23 +1,27 @@
-# 1. Start with an official Node.js image
+# backend/Dockerfile - PRODUCTION READY VERSION
 FROM node:20-alpine
 
-# 2. Set the working directory inside the container
+# Install necessary packages for Prisma
+RUN apk add --no-cache openssl
+
 WORKDIR /app
 
-# 3. Copy package files and install dependencies first
-# This caches this layer, so 'npm install' doesn't run every time you change code
+# Copy package files and install dependencies first (for better caching)
 COPY package*.json ./
-RUN npm install
+RUN npm ci --only=production
 
-# 4. Copy the rest of your backend code (including prisma schema)
+# Copy the entire codebase
 COPY . .
 
-# 5. Generate the Prisma Client (after copying all files)
+# Make the init script executable
+COPY scripts/init.sh /usr/local/bin/init.sh
+RUN chmod +x /usr/local/bin/init.sh
+
+# Generate Prisma Client at build time (for faster startup)
 RUN npx prisma generate
 
-# 6. Expose the port the app will run on
+# Expose the port
 EXPOSE 3001
 
-# 7. Define the command to start your app
-# Note: docker-compose.prod.yml overrides this anyway
-CMD ["node", "index.js"]
+# Use the initialization script
+CMD ["/usr/local/bin/init.sh"]
