@@ -1,41 +1,40 @@
-// frontend/app/dashboard/page.tsx - THE FINAL & COMPLETE VERSION
-"use client"
+/**
+ * Dashboard page for authenticated users to manage their devices
+ */
+"use client";
 
-import { useState, useEffect } from "react"
-import { useAuth } from "@/context/AuthContext"
-import { toast } from "sonner"
-import { Loader2 } from "lucide-react" // This is now used in the JSX
+import { useState, useEffect } from "react";
+import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
+
+import { useAuth } from "@/context/AuthContext";
+import type { Device } from "@/types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://intelvis.ai';
 
-interface Device {
-  id: string;
-  alias: string | null;
-  status: string;
-  nic: { mac: string } | null;
-}
-
 export default function DashboardPage() {
-  const { user, isAuthCheckComplete, logout } = useAuth()
-  const [devices, setDevices] = useState<Device[]>([])
-  const [macAddress, setMacAddress] = useState("")
-  const [isPairing, setIsPairing] = useState(false)
-  const [isFetchingDevices, setIsFetchingDevices] = useState(true)
+  const { user, isAuthCheckComplete, logout } = useAuth();
+  
+  // Device state
+  const [devices, setDevices] = useState<Device[]>([]);
+  const [isLoadingDevices, setIsLoadingDevices] = useState(true);
+  
+  // Form state
+  const [macAddress, setMacAddress] = useState("");
+  const [isPairingDevice, setIsPairingDevice] = useState(false);
 
   useEffect(() => {
     const fetchDevices = async () => {
-      // Wait for the initial auth check to be complete.
-      if (!isAuthCheckComplete) {
-        return;
-      }
-      // If the check is done and there's no user, redirect.
+      // Wait for auth check to complete
+      if (!isAuthCheckComplete) return;
+      
+      // Redirect if no user found
       if (!user) {
-        // The context's effect will handle the redirect, but we can stop fetching.
-        setIsFetchingDevices(false);
+        setIsLoadingDevices(false);
         return;
       }
 
-      setIsFetchingDevices(true);
+      setIsLoadingDevices(true);
       try {
         const response = await fetch(`${API_URL}/api/devices`, { credentials: 'include' });
         if (response.ok) {
@@ -47,10 +46,10 @@ export default function DashboardPage() {
           toast.error("Failed to fetch devices.");
         }
       } catch (error) {
-        console.error("An error occurred while fetching devices:", error);
-        toast.error("An error occurred while fetching devices.");
+        console.error("Error fetching devices:", error);
+        toast.error("Failed to load devices.");
       } finally {
-        setIsFetchingDevices(false);
+        setIsLoadingDevices(false);
       }
     };
 
@@ -59,11 +58,13 @@ export default function DashboardPage() {
 
   const handlePairDevice = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!macAddress) {
-      toast.error("MAC Address cannot be empty.");
+    
+    if (!macAddress.trim()) {
+      toast.error("MAC address is required.");
       return;
     }
-    setIsPairing(true);
+    
+    setIsPairingDevice(true);
     try {
       const response = await fetch(`${API_URL}/api/devices`, {
         method: 'POST',
@@ -77,16 +78,16 @@ export default function DashboardPage() {
         setDevices(prev => [...prev, newDevice]);
         setMacAddress('');
       } else if (response.status === 401) {
-        toast.error("Your session has expired. Please log in again.");
+        toast.error("Session expired. Please log in again.");
         logout();
       } else {
         toast.error(newDevice.message || 'Failed to pair device.');
       }
     } catch (error) {
-      console.error("An error occurred during pairing:", error);
-      toast.error("An error occurred during pairing.");
+      console.error("Error pairing device:", error);
+      toast.error("Failed to pair device.");
     } finally {
-      setIsPairing(false);
+      setIsPairingDevice(false);
     }
   };
 
@@ -119,14 +120,14 @@ export default function DashboardPage() {
                 onChange={(e) => setMacAddress(e.target.value)}
                 placeholder="AA:BB:CC:DD:EE:FF"
                 className="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                disabled={isPairing}
+                disabled={isPairingDevice}
               />
               <button
                 type="submit"
                 className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-4 rounded-md mt-4 transition-colors flex items-center justify-center disabled:bg-gray-600"
-                disabled={isPairing}
+                disabled={isPairingDevice}
               >
-                {isPairing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {isPairingDevice && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Pair Device
               </button>
             </form>
@@ -134,7 +135,7 @@ export default function DashboardPage() {
         </div>
         <div className="md:col-span-2">
           <h2 className="text-xl font-semibold mb-4">Your Devices</h2>
-          {isFetchingDevices ? (
+          {isLoadingDevices ? (
             <div className="text-center text-gray-500">
               <Loader2 className="h-6 w-6 animate-spin inline-block" />
               <p>Loading devices...</p>

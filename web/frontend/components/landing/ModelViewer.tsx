@@ -1,9 +1,11 @@
-// frontend/components/landing/ModelViewer.tsx
+/**
+ * 3D model viewer component for interactive sensor display
+ */
 'use client';
 
+import { Suspense, ComponentProps } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { useGLTF, OrbitControls, Environment } from '@react-three/drei';
-import { Suspense, ComponentProps } from 'react';
 
 type ModelProps = Omit<ComponentProps<'primitive'>, 'object'>;
 
@@ -15,11 +17,9 @@ function Model(props: ModelProps) {
 export default function ModelViewer() {
   return (
     <div className="flex h-full w-full flex-col">
-      <h3 className="mb-4 text-center text-xl font-semibold text-gray-100">Interactive 3D Model</h3>
-      {/*
-        FIX: Removed `flex-1` from the container and applied `aspect-[4/3]`.
-        This makes it perfectly match the carousel's size and responsiveness.
-      */}
+      <h3 className="mb-4 text-center text-xl font-semibold text-gray-100">
+        Interactive 3D Model
+      </h3>
       <div className="aspect-[4/3] w-full rounded-xl border border-gray-800 bg-gray-950 p-2 shadow-2xl">
         <Canvas camera={{ position: [0, 0, 7], fov: 50 }}>
           <Suspense fallback={null}>

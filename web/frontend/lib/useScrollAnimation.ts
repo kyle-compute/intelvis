@@ -1,13 +1,12 @@
+/**
+ * Custom hook for scroll-triggered animations using Intersection Observer
+ */
 'use client';
+
 import { useEffect, useRef, useState } from 'react';
+import type { ScrollAnimationOptions, ScrollAnimationReturn } from '@/types';
 
-interface UseScrollAnimationOptions {
-  threshold?: number;
-  rootMargin?: string;
-  triggerOnce?: boolean;
-}
-
-export function useScrollAnimation<T extends HTMLElement = HTMLElement>(options: UseScrollAnimationOptions = {}) {
+export function useScrollAnimation<T extends HTMLElement = HTMLElement>(options: ScrollAnimationOptions = {}): ScrollAnimationReturn<T> {
   const {
     threshold = 0.1,
     rootMargin = '0px 0px -10% 0px',

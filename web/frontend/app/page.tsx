@@ -25,10 +25,10 @@ export default function LandingPage() {
       {/* Content */}
       <div className="relative z-10">
         <main id="main-content">
-        <HeroSection />
-        <WhoIsItForSection />
-        <HowItWorksSection />
-        <WedgeInsightSection />
+          <HeroSection />
+          <WhoIsItForSection />
+          <HowItWorksSection />
+          <WedgeInsightSection />
           <CtaFormSection />
         </main>
         <Footer />

@@ -1,5 +1,8 @@
-// frontend/components/landing/HeroSection.tsx
+/**
+ * Hero section component with call-to-action
+ */
 'use client';
+
 import { useScrollAnimation, fadeInUpVariants } from '@/lib/useScrollAnimation';
 
 export function HeroSection() {

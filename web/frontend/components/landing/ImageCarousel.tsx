@@ -1,11 +1,14 @@
-// frontend/components/landing/ImageCarousel.tsx
+/**
+ * Image carousel component displaying product parts
+ */
 "use client";
+
+import Image from 'next/image';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Navigation, Pagination, Autoplay } from 'swiper/modules';
 import 'swiper/css';
 import 'swiper/css/navigation';
 import 'swiper/css/pagination';
-import Image from 'next/image';
 
 const images = [
   { src: "/assets/allparts.webp", alt: "Full IntelVis prototype parts", caption: "Full Prototype Parts (ESP32, Sensor, Battery)" },
@@ -15,13 +18,10 @@ const images = [
 
 export function ImageCarousel() {
   return (
-    // The h-full allows it to stretch vertically in the grid
     <div className="flex h-full w-full flex-col"> 
-      <h3 className="mb-4 text-center text-xl font-semibold text-gray-100">Built with Industrial-Grade Parts</h3>
-      {/* 
-        FIX: Removed `flex-1` and applied `aspect-[4/3]`.
-        This forces the container to a 4:3 aspect ratio, giving it a substantial, responsive height.
-      */}
+      <h3 className="mb-4 text-center text-xl font-semibold text-gray-100">
+        Built with Industrial-Grade Parts
+      </h3>
       <Swiper
         modules={[Navigation, Pagination, Autoplay]}
         navigation

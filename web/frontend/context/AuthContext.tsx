@@ -1,35 +1,19 @@
-// frontend/context/AuthContext.tsx - THIS IS THE ONLY CORRECT VERSION
-"use client"
+/**
+ * Authentication context providing user state and auth methods
+ */
+"use client";
 
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-  ReactNode,
-} from "react"
+import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import type { User, AuthContextType } from "@/types";
 
-interface User {
-  id: string
-  email: string
-}
-
-interface AuthContextType {
-  user: User | null
-  isLoading: boolean
-  isAuthCheckComplete: boolean
-  login: (email: string, password: string) => Promise<void>
-  logout: () => Promise<void>
-}
-
-const AuthContext = createContext<AuthContextType | undefined>(undefined)
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://intelvis.ai';
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
-  const [isAuthCheckComplete, setIsAuthCheckComplete] = useState(false)
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isAuthCheckComplete, setIsAuthCheckComplete] = useState(false);
 
   useEffect(() => {
     const checkSession = async () => {
