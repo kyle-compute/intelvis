@@ -1,7 +1,5 @@
-// backend/routes/devices.js - FINAL
 import { Router } from 'express';
 import prisma from '../lib/db.js';
-
 import { protect } from '../middleware/protect.js';
 
 const router = Router();
@@ -15,7 +13,7 @@ router.get('/', async (req, res, next) => {
     });
     res.status(200).json(devices);
   } catch (error) {
-    next(error); // <-- FIX: Pass errors to global handler
+    next(error);
   }
 });
 
@@ -26,15 +24,21 @@ router.post('/', async (req, res, next) => {
   const mac = rawMac.toLowerCase().trim();
 
   try {
-    const nic = await prisma.networkInterfaceCard.findUnique({ where: { mac } });
+    // CHANGED: Use 'nic' instead of 'networkInterfaceCard'
+    const nic = await prisma.nic.findUnique({ 
+      where: { mac },
+      include: { device: true }
+    });
+    
     if (!nic || !nic.deviceId) {
       return res.status(404).json({ message: 'Unprovisioned device not found' });
     }
 
-    const device = await prisma.device.findUnique({ where: { id: nic.deviceId } });
+    const device = nic.device;
     if (!device) {
       return res.status(404).json({ message: 'Device data inconsistent' });
     }
+    
     if (device.ownerId) {
       return res.status(409).json({ message: 'Device already paired' });
     }
@@ -44,10 +48,11 @@ router.post('/', async (req, res, next) => {
       data: { ownerId: req.user.id },
       include: { nic: true },
     });
+    
     res.status(201).json(updatedDevice);
   } catch (error) {
     console.error('Pairing Error:', error.message);
-    next(error); // <-- FIX: Pass errors to global handler
+    next(error);
   }
 });
 

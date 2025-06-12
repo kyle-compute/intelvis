@@ -1,11 +1,10 @@
-// backend/routes/provision.js
+// backend/routes/provision.js - FOR NIC MODEL
 import { Router } from 'express';
-import prisma from '../lib/db.js'; // <-- FIX: Import shared instance
+import prisma from '../lib/db.js';
 
 const router = Router();
 const PROVISIONING_API_KEY = process.env.PROVISIONING_API_KEY;
 
-// Middleware to protect the provisioning endpoint
 const protectProvisioning = (req, res, next) => {
   const apiKey = req.get('X-API-Key');
   if (apiKey && apiKey === PROVISIONING_API_KEY) {
@@ -26,7 +25,8 @@ router.post('/', protectProvisioning, async (req, res, next) => {
   const mac = rawMac.toLowerCase().trim();
 
   try {
-    const existingNic = await prisma.networkInterfaceCard.findUnique({
+    // CHANGED: Use 'nic' instead of 'networkInterfaceCard'
+    const existingNic = await prisma.nic.findUnique({
       where: { mac },
     });
 
@@ -36,7 +36,6 @@ router.post('/', protectProvisioning, async (req, res, next) => {
     }
 
     console.log(`[PROVISION] New device. Creating entry for MAC ${mac}.`);
-    // This now works because `ownerId` is optional in the schema.
     const newDevice = await prisma.device.create({
       data: {
         status: 'INACTIVE',
@@ -45,12 +44,16 @@ router.post('/', protectProvisioning, async (req, res, next) => {
           create: { mac },
         },
       },
+      include: {
+        nic: true,
+      },
     });
     
     console.log(`[PROVISION] Provisioned new device (ID: ${newDevice.id}) for MAC ${mac}.`);
     res.status(201).json({ message: 'Device provisioned successfully', deviceId: newDevice.id });
 
   } catch (error) {
+    console.error(`[PROVISION] Error for MAC ${mac}:`, error);
     error.message = `Provisioning failed for MAC [${mac}]: ${error.message}`;
     next(error);
   }

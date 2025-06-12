@@ -1,5 +1,3 @@
-# backend/Dockerfile
-
 # 1. Start with an official Node.js image
 FROM node:20-alpine
 
@@ -11,17 +9,15 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install
 
-# 4. Copy the Prisma schema
-COPY prisma ./prisma/
-
-# 5. Generate the Prisma Client
-RUN npx prisma generate
-
-# 6. Copy the rest of your backend code
+# 4. Copy the rest of your backend code (including prisma schema)
 COPY . .
 
-# 7. Expose the port the app will run on
+# 5. Generate the Prisma Client (after copying all files)
+RUN npx prisma generate
+
+# 6. Expose the port the app will run on
 EXPOSE 3001
 
-# 8. Define the command to start your app
-CMD [ "node", "index.js" ]
+# 7. Define the command to start your app
+# Note: docker-compose.prod.yml overrides this anyway
+CMD ["node", "index.js"]
