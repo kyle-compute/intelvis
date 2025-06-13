@@ -27,7 +27,7 @@ export function HowItWorksSection() {
           className={`mb-16 grid gap-6 md:gap-8 text-center grid-cols-1 md:grid-cols-3 ${fadeInUpVariants.hidden} ${stepsVisible ? fadeInUpVariants.visible : ''}`}
         >
           {[
-            { title: 'Deploy in Minutes', description: 'Magnetic mount or zip-tie near leak points. Industrial-grade housing. IP67 rated.' },
+            { title: 'Deploy in Minutes', description: 'Magnetic mount or zip-tie near leak points. Industrial-grade housing.' },
             { title: 'Monitor 24/7', description: 'Ultrasonic sensors detect leaks continuously. 2-year battery life. No maintenance required.' },
             { title: 'Alert with Cost Data', description: 'Instant notifications with leak location and projected annual cost impact.' },
           ].map((step, index) => (
@@ -57,8 +57,8 @@ export function HowItWorksSection() {
               <div className="text-sm text-gray-400">Battery Life</div>
             </div>
             <div className="bg-gray-900/50 border border-gray-700 rounded-lg p-3 md:p-4">
-              <div className="text-2xl font-bold text-green-400">IP67</div>
-              <div className="text-sm text-gray-400">Industrial Rating</div>
+              <div className="text-2xl font-bold text-green-400">5 Min</div>
+              <div className="text-sm text-gray-400">Install Time</div>
             </div>
             <div className="bg-gray-900/50 border border-gray-700 rounded-lg p-3 md:p-4">
               <div className="text-2xl font-bold text-yellow-400">Zero</div>

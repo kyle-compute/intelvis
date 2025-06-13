@@ -70,7 +70,18 @@ export function Navbar() {
       <div className="mx-auto flex h-14 w-full max-w-7xl items-center px-4">
         <Logo href={logoHref} />
 
-        <div className="ml-auto flex items-center gap-4">
+        {isMounted && user && (
+          <nav className="ml-auto mr-4 hidden md:flex items-center gap-6">
+            <Link href="/dashboard" className="text-sm font-medium text-foreground/70 hover:text-foreground transition-colors">
+              Dashboard
+            </Link>
+            <Link href="/analytics" className="text-sm font-medium text-foreground/70 hover:text-foreground transition-colors">
+              Analytics
+            </Link>
+          </nav>
+        )}
+        
+        <div className={isMounted && user ? "flex items-center gap-4" : "ml-auto flex items-center gap-4"}>
           {renderAuthSection()}
 
           {isMounted && (
@@ -81,6 +92,17 @@ export function Navbar() {
               <SheetContent side="right" className="w-80">
                 <Logo href={logoHref} />
                 <div className="mt-8 space-y-3">
+                  {user && (
+                    <>
+                      <Link href="/dashboard" className="block rounded-lg px-3 py-2 text-sm font-medium hover:bg-muted" onClick={() => setOpen(false)}>
+                        Dashboard
+                      </Link>
+                      <Link href="/analytics" className="block rounded-lg px-3 py-2 text-sm font-medium hover:bg-muted" onClick={() => setOpen(false)}>
+                        Analytics
+                      </Link>
+                      <div className="border-t border-border my-3"></div>
+                    </>
+                  )}
                   {renderAuthSection(true)}
                 </div>
               </SheetContent>
