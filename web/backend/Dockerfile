@@ -19,5 +19,5 @@ RUN npx prisma generate
 # Expose the port
 EXPOSE 3001
 
-# Start the application directly
-CMD ["node", "index.js"]
+# Use the initialization script that handles migrations
+CMD ["sh", "scripts/init.sh"]

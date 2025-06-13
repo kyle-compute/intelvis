@@ -1,8 +1,8 @@
-# Caddyfile - THE FIX
-# The global options block MUST be the very first thing in the file.
+# Caddyfile - Production SSL Configuration
+# Global options block for production SSL
 {
-    # Remove this block for production to get a real certificate.
-    acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
+    # Using Let's Encrypt production CA for real certificates
+    # Removed staging CA configuration to get real SSL certificates
 }
 
 # Then, define your site.
