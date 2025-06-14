@@ -39,6 +39,7 @@ export default function AnalyticsPage() {
 
   useEffect(() => {
     const fetchDevices = async () => {
+      const currentIsMobile = window.innerWidth < 768
       try {
         const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://intelvis.ai'
         const response = await fetch(`${API_URL}/api/devices`, {
@@ -55,9 +56,9 @@ export default function AnalyticsPage() {
         const deviceNodes: Node[] = devices.map((device: { id: string; nic: { mac: string }; status: string; alias?: string; connectivity?: { isConnected: boolean } }, index: number) => {
           // Arrange nodes in a circle for better visualization with responsive positioning
           const angle = (index * 2 * Math.PI) / devices.length
-          const radius = Math.min(isMobile ? 80 : 150, devices.length * (isMobile ? 20 : 30))
-          const centerX = isMobile ? 200 : 400
-          const centerY = isMobile ? 150 : 200
+          const radius = Math.min(currentIsMobile ? 80 : 150, devices.length * (currentIsMobile ? 20 : 30))
+          const centerX = currentIsMobile ? 200 : 400
+          const centerY = currentIsMobile ? 150 : 200
           
           const x = centerX + radius * Math.cos(angle)
           const y = centerY + radius * Math.sin(angle)
@@ -66,8 +67,8 @@ export default function AnalyticsPage() {
             id: device.id,
             name: device.alias || `Device ${device.nic?.mac?.slice(-4) || index + 1}`,
             type: device.connectivity?.isConnected ? 'active' : 'inactive',
-            x: Math.max(50, Math.min(x, isMobile ? 350 : 750)),
-            y: Math.max(50, Math.min(y, isMobile ? 250 : 350)),
+            x: Math.max(50, Math.min(x, currentIsMobile ? 350 : 750)),
+            y: Math.max(50, Math.min(y, currentIsMobile ? 250 : 350)),
             connections: [] // For now, we'll implement connections later based on network topology
           }
         })
@@ -98,9 +99,9 @@ export default function AnalyticsPage() {
         
         // Fallback to mock data if API fails
         const mockNodes: Node[] = [
-          { id: "1", name: "Main Hub", type: "hub", x: isMobile ? 200 : 400, y: isMobile ? 150 : 200, connections: ["2", "3"] },
-          { id: "2", name: "Sensor Node A", type: "active", x: isMobile ? 120 : 200, y: isMobile ? 80 : 100, connections: [] },
-          { id: "3", name: "Sensor Node B", type: "active", x: isMobile ? 280 : 600, y: isMobile ? 80 : 100, connections: [] }
+          { id: "1", name: "Main Hub", type: "hub", x: currentIsMobile ? 200 : 400, y: currentIsMobile ? 150 : 200, connections: ["2", "3"] },
+          { id: "2", name: "Sensor Node A", type: "active", x: currentIsMobile ? 120 : 200, y: currentIsMobile ? 80 : 100, connections: [] },
+          { id: "3", name: "Sensor Node B", type: "active", x: currentIsMobile ? 280 : 600, y: currentIsMobile ? 80 : 100, connections: [] }
         ]
 
         setNodes(mockNodes)
@@ -114,6 +115,29 @@ export default function AnalyticsPage() {
     }
 
     fetchDevices()
+  }, [])
+
+  // Reposition nodes when screen size changes
+  useEffect(() => {
+    if (nodes.length > 0) {
+      const updatedNodes = nodes.map((node, index) => {
+        // Recalculate positions for mobile/desktop
+        const angle = (index * 2 * Math.PI) / nodes.length
+        const radius = Math.min(isMobile ? 80 : 150, nodes.length * (isMobile ? 20 : 30))
+        const centerX = isMobile ? 200 : 400
+        const centerY = isMobile ? 150 : 200
+        
+        const x = centerX + radius * Math.cos(angle)
+        const y = centerY + radius * Math.sin(angle)
+        
+        return {
+          ...node,
+          x: Math.max(50, Math.min(x, isMobile ? 350 : 750)),
+          y: Math.max(50, Math.min(y, isMobile ? 250 : 350))
+        }
+      })
+      setNodes(updatedNodes)
+    }
   }, [isMobile])
 
   const handleMouseDown = (e: React.MouseEvent, nodeId: string) => {
