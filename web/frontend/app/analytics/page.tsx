@@ -56,9 +56,9 @@ export default function AnalyticsPage() {
         const deviceNodes: Node[] = devices.map((device: { id: string; nic: { mac: string }; status: string; alias?: string; connectivity?: { isConnected: boolean } }, index: number) => {
           // Arrange nodes in a circle for better visualization with responsive positioning
           const angle = (index * 2 * Math.PI) / devices.length
-          const radius = Math.min(currentIsMobile ? 80 : 150, devices.length * (currentIsMobile ? 20 : 30))
-          const centerX = currentIsMobile ? 200 : 400
-          const centerY = currentIsMobile ? 150 : 200
+          const radius = Math.min(currentIsMobile ? 60 : 150, devices.length * (currentIsMobile ? 15 : 30))
+          const centerX = currentIsMobile ? 150 : 400
+          const centerY = currentIsMobile ? 120 : 200
           
           const x = centerX + radius * Math.cos(angle)
           const y = centerY + radius * Math.sin(angle)
@@ -67,8 +67,8 @@ export default function AnalyticsPage() {
             id: device.id,
             name: device.alias || `Device ${device.nic?.mac?.slice(-4) || index + 1}`,
             type: device.connectivity?.isConnected ? 'active' : 'inactive',
-            x: Math.max(50, Math.min(x, currentIsMobile ? 350 : 750)),
-            y: Math.max(50, Math.min(y, currentIsMobile ? 250 : 350)),
+            x: Math.max(30, Math.min(x, currentIsMobile ? 270 : 750)),
+            y: Math.max(30, Math.min(y, currentIsMobile ? 210 : 350)),
             connections: [] // For now, we'll implement connections later based on network topology
           }
         })
@@ -99,9 +99,9 @@ export default function AnalyticsPage() {
         
         // Fallback to mock data if API fails
         const mockNodes: Node[] = [
-          { id: "1", name: "Main Hub", type: "hub", x: currentIsMobile ? 200 : 400, y: currentIsMobile ? 150 : 200, connections: ["2", "3"] },
-          { id: "2", name: "Sensor Node A", type: "active", x: currentIsMobile ? 120 : 200, y: currentIsMobile ? 80 : 100, connections: [] },
-          { id: "3", name: "Sensor Node B", type: "active", x: currentIsMobile ? 280 : 600, y: currentIsMobile ? 80 : 100, connections: [] }
+          { id: "1", name: "Main Hub", type: "hub", x: currentIsMobile ? 150 : 400, y: currentIsMobile ? 120 : 200, connections: ["2", "3"] },
+          { id: "2", name: "Sensor Node A", type: "active", x: currentIsMobile ? 100 : 200, y: currentIsMobile ? 80 : 100, connections: [] },
+          { id: "3", name: "Sensor Node B", type: "active", x: currentIsMobile ? 200 : 600, y: currentIsMobile ? 80 : 100, connections: [] }
         ]
 
         setNodes(mockNodes)
@@ -123,17 +123,17 @@ export default function AnalyticsPage() {
       const updatedNodes = nodes.map((node, index) => {
         // Recalculate positions for mobile/desktop
         const angle = (index * 2 * Math.PI) / nodes.length
-        const radius = Math.min(isMobile ? 80 : 150, nodes.length * (isMobile ? 20 : 30))
-        const centerX = isMobile ? 200 : 400
-        const centerY = isMobile ? 150 : 200
+        const radius = Math.min(isMobile ? 60 : 150, nodes.length * (isMobile ? 15 : 30))
+        const centerX = isMobile ? 150 : 400
+        const centerY = isMobile ? 120 : 200
         
         const x = centerX + radius * Math.cos(angle)
         const y = centerY + radius * Math.sin(angle)
         
         return {
           ...node,
-          x: Math.max(50, Math.min(x, isMobile ? 350 : 750)),
-          y: Math.max(50, Math.min(y, isMobile ? 250 : 350))
+          x: Math.max(30, Math.min(x, isMobile ? 270 : 750)),
+          y: Math.max(30, Math.min(y, isMobile ? 210 : 350))
         }
       })
       setNodes(updatedNodes)
@@ -256,7 +256,7 @@ export default function AnalyticsPage() {
         <h2 className="text-xl font-semibold mb-4">Network Topology</h2>
         <div 
           ref={containerRef}
-          className="relative w-full h-96 md:h-96 bg-card rounded-lg border overflow-hidden cursor-crosshair touch-none"
+          className="relative w-full h-64 md:h-96 bg-card rounded-lg border cursor-crosshair touch-none"
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
@@ -314,8 +314,8 @@ export default function AnalyticsPage() {
                 draggedNode === node.id ? 'ring-2 ring-white ring-opacity-50' : ''
               } touch-manipulation`}
               style={{
-                left: node.x - 24,
-                top: node.y - 24,
+                left: Math.max(0, node.x - 24),
+                top: Math.max(0, node.y - 24),
                 zIndex: draggedNode === node.id ? 10 : 2
               }}
               onMouseDown={(e) => handleMouseDown(e, node.id)}
@@ -332,8 +332,8 @@ export default function AnalyticsPage() {
               key={`label-${node.id}`}
               className="absolute text-xs sm:text-sm font-medium text-center pointer-events-none"
               style={{
-                left: node.x - 40,
-                top: node.y + 35,
+                left: Math.max(0, node.x - 40),
+                top: Math.max(0, node.y + 35),
                 width: 80,
                 zIndex: 3
               }}
