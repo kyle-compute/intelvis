@@ -18,7 +18,7 @@ const images = [
 
 export function ImageCarousel() {
   return (
-    <div className="flex h-full w-full flex-col"> 
+    <div className="flex h-full w-full flex-col overflow-hidden"> 
       <h3 className="mb-4 text-center text-xl font-semibold text-gray-100">
         Built with Industrial-Grade Parts
       </h3>
@@ -28,8 +28,8 @@ export function ImageCarousel() {
         pagination={{ clickable: true }}
         loop={true}
         autoplay={{ delay: 5000, disableOnInteraction: true }}
-        className="aspect-[4/3] w-full rounded-xl border border-gray-800 bg-gray-950 shadow-2xl overflow-hidden"
-        style={{ overflow: 'hidden' }}
+        className="aspect-[4/3] w-full max-w-full rounded-xl border border-gray-800 bg-gray-950 shadow-2xl"
+        style={{ overflow: 'hidden', maxWidth: '100%' }}
         breakpoints={{
           320: {
             slidesPerView: 1,
