@@ -22,8 +22,20 @@ export default function AnalyticsPage() {
   const [connections, setConnections] = useState<Connection[]>([])
   const [draggedNode, setDraggedNode] = useState<string | null>(null)
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
+  const [isMobile, setIsMobile] = useState(false)
   const svgRef = useRef<SVGSVGElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const checkIsMobile = () => {
+      setIsMobile(window.innerWidth < 768)
+    }
+    
+    checkIsMobile()
+    window.addEventListener('resize', checkIsMobile)
+    
+    return () => window.removeEventListener('resize', checkIsMobile)
+  }, [])
 
   useEffect(() => {
     const fetchDevices = async () => {
@@ -41,11 +53,11 @@ export default function AnalyticsPage() {
         
         // Convert devices to nodes with positioning
         const deviceNodes: Node[] = devices.map((device: { id: string; nic: { mac: string }; status: string; alias?: string; connectivity?: { isConnected: boolean } }, index: number) => {
-          // Arrange nodes in a circle for better visualization
+          // Arrange nodes in a circle for better visualization with responsive positioning
           const angle = (index * 2 * Math.PI) / devices.length
-          const radius = Math.min(150, devices.length * 30)
-          const centerX = 400
-          const centerY = 200
+          const radius = Math.min(isMobile ? 80 : 150, devices.length * (isMobile ? 20 : 30))
+          const centerX = isMobile ? 200 : 400
+          const centerY = isMobile ? 150 : 200
           
           const x = centerX + radius * Math.cos(angle)
           const y = centerY + radius * Math.sin(angle)
@@ -54,8 +66,8 @@ export default function AnalyticsPage() {
             id: device.id,
             name: device.alias || `Device ${device.nic?.mac?.slice(-4) || index + 1}`,
             type: device.connectivity?.isConnected ? 'active' : 'inactive',
-            x: Math.max(50, Math.min(x, 750)),
-            y: Math.max(50, Math.min(y, 350)),
+            x: Math.max(50, Math.min(x, isMobile ? 350 : 750)),
+            y: Math.max(50, Math.min(y, isMobile ? 250 : 350)),
             connections: [] // For now, we'll implement connections later based on network topology
           }
         })
@@ -86,9 +98,9 @@ export default function AnalyticsPage() {
         
         // Fallback to mock data if API fails
         const mockNodes: Node[] = [
-          { id: "1", name: "Main Hub", type: "hub", x: 400, y: 200, connections: ["2", "3"] },
-          { id: "2", name: "Sensor Node A", type: "active", x: 200, y: 100, connections: [] },
-          { id: "3", name: "Sensor Node B", type: "active", x: 600, y: 100, connections: [] }
+          { id: "1", name: "Main Hub", type: "hub", x: isMobile ? 200 : 400, y: isMobile ? 150 : 200, connections: ["2", "3"] },
+          { id: "2", name: "Sensor Node A", type: "active", x: isMobile ? 120 : 200, y: isMobile ? 80 : 100, connections: [] },
+          { id: "3", name: "Sensor Node B", type: "active", x: isMobile ? 280 : 600, y: isMobile ? 80 : 100, connections: [] }
         ]
 
         setNodes(mockNodes)
@@ -102,7 +114,7 @@ export default function AnalyticsPage() {
     }
 
     fetchDevices()
-  }, [])
+  }, [isMobile])
 
   const handleMouseDown = (e: React.MouseEvent, nodeId: string) => {
     const node = nodes.find(n => n.id === nodeId)
@@ -115,6 +127,21 @@ export default function AnalyticsPage() {
     setDragOffset({
       x: e.clientX - rect.left - node.x,
       y: e.clientY - rect.top - node.y
+    })
+  }
+
+  const handleTouchStart = (e: React.TouchEvent, nodeId: string) => {
+    const node = nodes.find(n => n.id === nodeId)
+    if (!node) return
+
+    const rect = containerRef.current?.getBoundingClientRect()
+    if (!rect) return
+
+    const touch = e.touches[0]
+    setDraggedNode(nodeId)
+    setDragOffset({
+      x: touch.clientX - rect.left - node.x,
+      y: touch.clientY - rect.top - node.y
     })
   }
 
@@ -134,7 +161,29 @@ export default function AnalyticsPage() {
     )
   }
 
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!draggedNode || !containerRef.current) return
+
+    const rect = containerRef.current.getBoundingClientRect()
+    const touch = e.touches[0]
+    const newX = touch.clientX - rect.left - dragOffset.x
+    const newY = touch.clientY - rect.top - dragOffset.y
+
+    setNodes(prevNodes =>
+      prevNodes.map(node =>
+        node.id === draggedNode
+          ? { ...node, x: Math.max(50, Math.min(newX, rect.width - 50)), y: Math.max(50, Math.min(newY, rect.height - 50)) }
+          : node
+      )
+    )
+  }
+
   const handleMouseUp = () => {
+    setDraggedNode(null)
+    setDragOffset({ x: 0, y: 0 })
+  }
+
+  const handleTouchEnd = () => {
     setDraggedNode(null)
     setDragOffset({ x: 0, y: 0 })
   }
@@ -183,10 +232,12 @@ export default function AnalyticsPage() {
         <h2 className="text-xl font-semibold mb-4">Network Topology</h2>
         <div 
           ref={containerRef}
-          className="relative w-full h-96 bg-card rounded-lg border overflow-hidden cursor-crosshair"
+          className="relative w-full h-96 md:h-96 bg-card rounded-lg border overflow-hidden cursor-crosshair touch-none"
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
         >
           {/* SVG for connections */}
           <svg
@@ -235,15 +286,16 @@ export default function AnalyticsPage() {
           {nodes.map((node) => (
             <div
               key={node.id}
-              className={`absolute w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-xs cursor-grab active:cursor-grabbing shadow-lg ${getNodeColor(node.type)} ${
+              className={`absolute w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center text-white font-bold text-xs sm:text-sm cursor-grab active:cursor-grabbing shadow-lg ${getNodeColor(node.type)} ${
                 draggedNode === node.id ? 'ring-2 ring-white ring-opacity-50' : ''
-              }`}
+              } touch-manipulation`}
               style={{
                 left: node.x - 24,
                 top: node.y - 24,
                 zIndex: draggedNode === node.id ? 10 : 2
               }}
               onMouseDown={(e) => handleMouseDown(e, node.id)}
+              onTouchStart={(e) => handleTouchStart(e, node.id)}
               title={`${node.name} (${node.type})`}
             >
               {node.name.charAt(0)}
@@ -254,7 +306,7 @@ export default function AnalyticsPage() {
           {nodes.map((node) => (
             <div
               key={`label-${node.id}`}
-              className="absolute text-xs font-medium text-center pointer-events-none"
+              className="absolute text-xs sm:text-sm font-medium text-center pointer-events-none"
               style={{
                 left: node.x - 40,
                 top: node.y + 35,

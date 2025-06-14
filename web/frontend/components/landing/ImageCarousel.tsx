@@ -28,7 +28,18 @@ export function ImageCarousel() {
         pagination={{ clickable: true }}
         loop={true}
         autoplay={{ delay: 5000, disableOnInteraction: true }}
-        className="aspect-[4/3] w-full rounded-xl border border-gray-800 bg-gray-950 shadow-2xl"
+        className="aspect-[4/3] w-full rounded-xl border border-gray-800 bg-gray-950 shadow-2xl overflow-hidden"
+        style={{ overflow: 'hidden' }}
+        breakpoints={{
+          320: {
+            slidesPerView: 1,
+            spaceBetween: 10,
+          },
+          768: {
+            slidesPerView: 1,
+            spaceBetween: 20,
+          },
+        }}
       >
         {images.map((img) => (
           <SwiperSlide key={img.src} className="flex flex-col items-center justify-center p-4 pb-12">
