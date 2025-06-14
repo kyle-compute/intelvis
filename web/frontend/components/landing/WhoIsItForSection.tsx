@@ -30,7 +30,7 @@ export function WhoIsItForSection() {
           </div>
 
           {/* Medium Facility */}
-          <div className="bg-blue-900/20 border border-blue-600 rounded-lg p-6 transform md:scale-105">
+          <div className="bg-blue-900/20 border border-blue-600 rounded-lg p-6 md:transform md:scale-105">
             <div className="bg-blue-600 text-white text-xs font-bold py-1 px-3 rounded-full w-fit mx-auto mb-4">
               MOST COMMON
             </div>

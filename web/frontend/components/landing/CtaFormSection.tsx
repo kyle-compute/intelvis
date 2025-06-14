@@ -69,7 +69,12 @@ export function CtaFormSection() {
                   <FormItem><FormLabel className="text-gray-400">Annual Compressed Air Spend or Plant Size <span className="text-gray-500">(Optional)</span></FormLabel><FormControl><Textarea placeholder="e.g., $200K annual air costs, 500,000 sq ft facility..." {...field} className="bg-black border-gray-700 text-gray-50 placeholder:text-gray-600 focus-visible:ring-blue-500" /></FormControl><FormMessage /></FormItem>
               )} />
               <Button type="submit" className="w-full text-lg py-6 bg-blue-600 hover:bg-blue-500" disabled={form.formState.isSubmitting}>
-                {form.formState.isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : "Submit for us to personally reach out within 24 hours!"}
+                {form.formState.isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : (
+                  <>
+                    <span className="block sm:hidden">Submit for ROI Projection</span>
+                    <span className="hidden sm:block">Submit for us to personally reach out within 24 hours!</span>
+                  </>
+                )}
               </Button>
             </form>
           </Form>

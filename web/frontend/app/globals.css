@@ -110,6 +110,10 @@
 @layer base {
   * { @apply border-border outline-ring/50; }
   
+  html, body { 
+    overflow-x: hidden;
+  }
+  
   body { 
     @apply text-foreground;
     background: linear-gradient(135deg, 
